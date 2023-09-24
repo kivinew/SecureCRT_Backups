@@ -11,6 +11,12 @@ Sub Main
   crt.Screen.Send "su" + chr(13)
   crt.Screen.WaitForString " #"
 
+  crt.Screen.Send "rm -rf /system/data/*" + chr(13)
+  crt.Screen.WaitForString " #"
+
+  crt.Screen.Send "rm -rf /system/tmp/*" + chr(13)
+  crt.Screen.WaitForString " #"
+
   crt.Screen.Send "rm -rf /data/*" + chr(13)
   crt.Screen.WaitForString " #"
 

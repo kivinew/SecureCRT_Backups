@@ -40,9 +40,9 @@ def main():
 		if (crt.Screen.WaitForStrings(pressQ, 5)):
 			crt.Screen.Send("q\r")
 		crt.Screen.Send(getRegisterInfo)
-		if (crt.Screen.WaitForStrings(pressQ, 5)):
+		if (crt.Screen.WaitForStrings(pressQ, 2)):
 			crt.Screen.Send("q\r")
-		crt.Screen.WaitForStrings(dashLine, 3)
+		crt.Screen.WaitForStrings(dashLine, 1)
 		crt.Screen.Send(getEthPorts)
 		crt.Screen.Send("q\r")
 

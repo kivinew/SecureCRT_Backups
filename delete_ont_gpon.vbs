@@ -24,30 +24,19 @@ def main():
 		ifaceGpon = "interface gpon " + frame + "/" + slot + chr(13)
 		undoServPort = "undo service-port "
 
-
-
-
 		crt.Screen.Send(servicePorts)
-		if (crt.Screen.WaitForStrings(pressQ, 5)):
-			crt.Screen.Send(" ")
-
+				
 		strResult = crt.Screen.ReadString("return")
 
+		list = strResult.replace('\\n', ' ').split()
 
+		srvPort1 = list.index("service-port") + 1
+		srvPort2 = list.index("service-port") + 1
+		srvPort3 = list.index("service-port") + 1
+		srvPort4 = list.index("service-port") + 1
 
-		
-			
-		re.Pattern = "service-port"
-			
-
-		if re.search(strResult) == True:
-			matches = re.Execute(strResult)
-			for match in matches:
-		 		srvPorts = match.SubMatches(0)
-		
-
-		crt.Screen.Send("Serial number extracted as: " + srvPorts)
-
-
+		crt.Screen.Send("display service-port " + list[srvPort1] + chr(13))
+		if (crt.Screen.WaitForStrings(pressQ)):
+			crt.Screen.Send("q")
 
 main()
