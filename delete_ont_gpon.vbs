@@ -35,8 +35,9 @@ def main():
 		srvPort3 = list.index("service-port") + 1
 		srvPort4 = list.index("service-port") + 1
 
+		"""
 		crt.Screen.Send("display service-port " + list[srvPort1] + chr(13))
 		if (crt.Screen.WaitForStrings(pressQ)):
 			crt.Screen.Send("q")
-
+		"""
 main()
