@@ -2,7 +2,6 @@
 # $interface = "1.0"
 
 import pyperclip
-import re
 
 crt.Screen.Synchronous = True	
 
@@ -30,14 +29,11 @@ def main():
 
 		list = strResult.replace('\\n', ' ').split()
 
-		srvPort1 = list.index("service-port") + 1
-		srvPort2 = list.index("service-port") + 1
-		srvPort3 = list.index("service-port") + 1
-		srvPort4 = list.index("service-port") + 1
+		for index, elem in enumerate(list):
+			if elem == "service-port":
+				crt.Screen.Send("undo service-port " + str(list[index + 1]) + chr(13))
 
-		"""
-		crt.Screen.Send("display service-port " + list[srvPort1] + chr(13))
-		if (crt.Screen.WaitForStrings(pressQ)):
-			crt.Screen.Send("q")
-		"""
+		crt.Screen.Send("interface gpon " + frame + '/' + slot + chr(13))
+		crt.Screen.Send("ont delete " + port + ' ' + ont + chr(13) + 'q\r')
+			
 main()
