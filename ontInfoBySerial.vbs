@@ -12,10 +12,7 @@ def main():
 	# разбить содержимое буфера в список
 	ONT = memBuffer.replace('/', ' ').split()
 
-	frame = ONT[0]
-	slot  = ONT[1]
-	port  = ONT[2]
-	ont   = ONT[3]
+	sn = ONT[0]
 
 	if memBuffer:
 		pressQ = "( Press 'Q' to break ) ----"

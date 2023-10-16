@@ -6,7 +6,7 @@ crt.Screen.Synchronous = True
 ' HS8545M5_WAN - 80 порт
 ' WanAccess - порт 88
 ' WanAccess_HG8245 - порт 80
-' WanAccess | WanAccess_HG8245 | all | IP | wifi | inet_tv_wifi_vlan2 | inet_tv_wifi_test
+' WanAccess | WanAccess_HG8245 | ALL_for_HS8545M5 | all | IP | wifi | inet_tv_wifi_vlan2 | inet_tv_wifi_test
 '########################################################################################################'
 ' переменные ont
 dim slot
@@ -25,10 +25,10 @@ status=true
 ' Указать slot, port, ont и имя файла для заливки'
 ' frame = 0 всегда'
 slot        = "0"
-port        = "1"
-ont         = "63"
-conf        = "all"
-description = "fl_100813"
+port        = "2"
+ont         = "80"
+conf        = "WanAccess_HG8245"
+description = "fl_102248"
 '########################################################################################################'
 
 Sub Main()
@@ -41,17 +41,17 @@ Sub Main()
 		crt.Screen.Send "display ont-load select 0/" + slot + " " + port + " " + ont & vbcr		
 		condition = crt.Screen.WaitForStrings("Success","Fail","Loading")
 		Select Case condition
-		Case 1
-' Конфига залита - выход из цикла опроса'
-			status=false
-		Case 2
-' Сбой конфигурации - выход из цикла опроса
-			status=false
-			crt.Dialog.MessageBox("Сбой конфигурации")
-		Case Else
-' Пауза 2 сек'
-			crt.Sleep 2000
-		End Select
+			Case 1
+				' Конфига залита - выход из цикла опроса'
+				status=false
+			Case 2
+				' Сбой конфигурации - выход из цикла опроса
+				status=false
+				crt.Dialog.MessageBox("Сбой конфигурации")
+			Case Else
+				' Пауза 2 сек'
+				crt.Sleep 2000
+			End Select
 	wend 
 ' Завершение конфигурации в режиме diagnoseS'
 	crt.Screen.Send "ont-load stop" & vbcr
