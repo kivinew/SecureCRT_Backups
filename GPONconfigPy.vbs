@@ -7,10 +7,7 @@ crt.Screen.Synchronous = True
 
 	ONT = memBuffer.replace('/', ' ').split()
 
-	frame = ONT[0]
-	slot  = ONT[1]
-	port  = ONT[2]
-	ont   = ONT[3]
+	frame, slot, port, ont = ONT[0], ONT[1], ONT[2], ONT[3]
 
 '''
  HS8545M5_WAN - 80 порт
