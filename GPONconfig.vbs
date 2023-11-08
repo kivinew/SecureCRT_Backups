@@ -32,13 +32,13 @@ description = "fl_102248"
 '########################################################################################################'
 
 Sub Main()
-	crt.Screen.Send "display ont version 0 " + slot + " " + port + " " + ont & vbcr
-	crt.Screen.Send "diagnose" & vbcr
-	crt.Screen.Send "ont-load info configuration " + conf + ".xml ftp 10.2.1.3 huawei ksa5oz6y" & vbcr
-	crt.Screen.Send "ont-load select 0/" + slot + " " + port + " " + ont & vbcr
-	crt.Screen.Send "ont-load start" & vbcr & vbcr	
+	crt.Screen.Send "display ont version 0 " + slot + " " + port + " " + ont + chr(13)
+	crt.Screen.Send "diagnose" + chr(13)
+	crt.Screen.Send "ont-load info configuration " + conf + ".xml ftp 10.2.1.3 huawei ksa5oz6y" + chr(13)
+	crt.Screen.Send "ont-load select 0/" + slot + " " + port + " " + ont + chr(13)
+	crt.Screen.Send "ont-load start" + chr(13) + chr(13)	
 	while (status)
-		crt.Screen.Send "display ont-load select 0/" + slot + " " + port + " " + ont & vbcr		
+		crt.Screen.Send "display ont-load select 0/" + slot + " " + port + " " + ont + chr(13)		
 		condition = crt.Screen.WaitForStrings("Success","Fail","Loading")
 		Select Case condition
 			Case 1
@@ -54,15 +54,15 @@ Sub Main()
 			End Select
 	wend 
 ' Завершение конфигурации в режиме diagnoseS'
-	crt.Screen.Send "ont-load stop" & vbcr
-	crt.Screen.Send	"config" & vbcr
-	crt.Screen.Send "interface gpon 0/" + slot & vbcr
+	crt.Screen.Send "ont-load stop" + chr(13)
+	crt.Screen.Send	"config" + chr(13)
+	crt.Screen.Send "interface gpon 0/" + slot + chr(13)
 ' Если конфига с пропиской IP то вывести настройки WAN интерфейса'    
 	if conf = "all" or conf = "IP" or conf = "inet_tv_wifi_vlan2" then
-		crt.Screen.Send "display ont wan-info " + port + " " + ont & vbcr
+		crt.Screen.Send "display ont wan-info " + port + " " + ont + chr(13)
 	end if
 	crt.Screen.WaitForStrings(")#")
-	crt.Screen.Send "ont modify " + port + " " + ont + " desc " + description & vbcr
-	crt.Screen.Send "ont remote-ping " + port + " " + ont + " ip-address 8.8.8.8" & vbcr
-	crt.Screen.Send "quit" & vbcr
+	crt.Screen.Send "ont modify " + port + " " + ont + " desc " + description + chr(13)
+	crt.Screen.Send "ont remote-ping " + port + " " + ont + " ip-address 8.8.8.8" + chr(13)
+	crt.Screen.Send "quit" + chr(13)
 End Sub
