@@ -1,4 +1,4 @@
-﻿#$language = "VBScript"
+#$language = "VBScript"
 #$interface = "1.0"
 
 crt.Screen.Synchronous = True
@@ -6,7 +6,7 @@ crt.Screen.Synchronous = True
 ' HS8545M5_WAN - 80 порт
 ' WanAccess - порт 88
 ' WanAccess_HG8245 - порт 80
-' WanAccess | WanAccess_HG8245 | ALL_for_HS8545M5 | all | IP | wifi | inet_tv_wifi_vlan2 | inet_tv_wifi_test
+' WanAccess | WanAccess_HG8245 | ALL_for_HS8545M5 | ALL_for_HG8245H | IP | all_dlya_abonov
 '########################################################################################################'
 ' переменные ont
 dim slot
@@ -24,11 +24,11 @@ status=true
 '########################################################################################################'
 ' Указать slot, port, ont и имя файла для заливки'
 ' frame = 0 всегда'
-slot        = "0"
-port        = "2"
-ont         = "80"
-conf        = "WanAccess_HG8245"
-description = "fl_102248"
+slot        = "1"
+port        = "1"
+ont         = "52"
+conf        = "IP"
+description = "fl_81666"
 '########################################################################################################'
 
 Sub Main()
@@ -61,7 +61,7 @@ Sub Main()
 	if conf = "all" or conf = "IP" or conf = "inet_tv_wifi_vlan2" then
 		crt.Screen.Send "display ont wan-info " + port + " " + ont & vbcr
 	end if
-	crt.Screen.WaitForStrings(")#")
+	crt.Screen.WaitForString(")#")
 	crt.Screen.Send "ont modify " + port + " " + ont + " desc " + description & vbcr
 	crt.Screen.Send "ont remote-ping " + port + " " + ont + " ip-address 8.8.8.8" & vbcr
 	crt.Screen.Send "quit" & vbcr

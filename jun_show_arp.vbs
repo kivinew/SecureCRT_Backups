@@ -8,11 +8,7 @@ crt.Screen.Synchronous = True
 def main():
 	
 	memBuffer = pyperclip.paste()
-	
-	if memBuffer:
+		
+	crt.Screen.Send(f"show arp no-resolve | match {memBuffer}\r")
 
-		sendRequest = "ping " + memBuffer + " detail record-route" + chr(13)
-
-		crt.Screen.Send(sendRequest)
-	
 main()

@@ -25,4 +25,6 @@ Sub Main
 
   crt.Screen.Send "sync" + chr(13)
   crt.Screen.WaitForString " #"
+
+  crt.Screen.Send "exit" + chr(13)
 End Sub

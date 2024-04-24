@@ -9,7 +9,7 @@ def main():
 	
 	memBuffer = pyperclip.paste()
 	
-	sendRequest = "show arp no-resolve | match " + memBuffer + "\r"
+	sendRequest = f"show route table inet.1 | match {memBuffer}\n"
 	
 	crt.Screen.Send(sendRequest)
 

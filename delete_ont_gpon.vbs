@@ -5,6 +5,7 @@ import pyperclip
 crt.Screen.Synchronous = True	
 
 def main():
+
 	# текстовые константы
 	pressQ = "( Press 'Q' to break ) ----"
 	servicePorts = "display current-configuration ont "
@@ -20,12 +21,15 @@ def main():
 			self.ont = ontList[3]
 			self.sn: str = 0
 			self.srvPort: list = 0
+
 		# вывод конфигурации ONT
 		def getCurrentConfig(self) -> list:
 			return str(self.srvPort)
+
 		# метод удаления ONT
 		def deleteOnt(self) -> None:
 			crt.Screen.Send(servicePorts + str(self.frame) + '/' + str(self.slot) + '/' + str(self.port) + ' ' + str(self.ont) + chr(13))
+			crt.Screen.Send(' ')
 			# поместить вывод команды до строки "return" в буфер
 			strResult:str = crt.Screen.ReadString("return")
 			# разделение строки на список слов
@@ -38,9 +42,11 @@ def main():
 			crt.Screen.Send(ifaceGpon + str(self.frame) + '/' + str(self.slot) + chr(13))
 			crt.Screen.Send(ontDelete + str(self.port) + ' ' + str(self.ont) + chr(13))
 			crt.Screen.Send("q\r" + chr(13))
+
 		# метод вывода серийника
 		def getSerial(self) -> str:
 			return self.sn
+
 		# метод вывода уровня сигнала	
 		def getOpticalInfo(self) -> str:
 			pass
@@ -48,8 +54,10 @@ def main():
 	# поместить выделенный фрагмент экрана в буфер
 	memBuffer = pyperclip.paste()
 	ontSelect = memBuffer.replace('/', ' ').split()
+
 	# создать объект Ont
 	ont: Ont = Ont(ontSelect)
+
 	# удалить Ont
 	ont.deleteOnt()
 			

@@ -8,10 +8,12 @@ crt.Screen.Synchronous = True
 def main():
 	
 	memBuffer = pyperclip.paste()
+	memBuffer = memBuffer.split()
+	ip, interface = memBuffer[0], memBuffer[1]
 	
 	if memBuffer:
 
-		sendRequest = "ping " + memBuffer + " detail record-route" + chr(13)
+		sendRequest = "clear arp interface " + interface + " vpn NAT-IPoE hostname " + ip + chr(13)
 
 		crt.Screen.Send(sendRequest)
 	

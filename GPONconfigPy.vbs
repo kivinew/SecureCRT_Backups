@@ -1,9 +1,13 @@
 ﻿# $language = "Python3"
 # $interface = "1.0"
+
+# для заливки конфигурации на онт необходимо выделить мышкой значение ONT ( например 0 /0 /7 29 )
+
 import pyperclip
 crt.Screen.Synchronous = True	
 
 def main():
+	# содержимое буфера обмена помещается в переменную
 	memBuffer = pyperclip.paste()
 
 	ONT = memBuffer.replace('/', ' ').split()
@@ -22,17 +26,17 @@ def main():
 
 
 	# содержит True, если получена указанная в аргументах одна из строк
-	condition: bool = False
+	condition: str
 	# состояние заливки конфига в цикле while/wend
-	status: bool =True
+	status: bool = True
 
 	# номер лицевого счёта для дескрипшена
 	description: str
 	# файл конфигурации
 	conf: str
 
-	conf        = "WanAccess_HG8245"
-	description = "fl_70921"
+	conf = "WanAccess_HG8245"
+	description = "fl_84020"
 	#########################################################################################################'
 
 	crt.Screen.Send("display ont version 0 " + slot + " " + port + " " + ont + chr(13))
@@ -45,19 +49,18 @@ def main():
 	# цикл проверки загрузки конфигурации
 	while (status):
 		crt.Screen.Send("display ont-load select 0/" + slot + " " + port + " " + ont + chr(13))
-		condition = crt.Screen.WaitForStrings("Success", "Fail", "Loading")
+		condition = crt.Screen.WaitForString("Success", 1)		 #### Ошибка Python AN INTEGER IS REQUIRED!!!
 		match condition:
 			case ["Success"]:
 				# Конфига залита - выход из цикла опроса'
-				status=false
+				status = False
 			case ["Fail"]:
 				# Сбой конфигурации - выход из цикла опроса
-				status=false
+				status = False
 				crt.Dialog.MessageBox("Сбой конфигурации")
 			case _:
 				# Пауза 2 сек'
 				crt.Sleep(2000)
-	wend 
 
 
 # Завершение конфигурации в режиме diagnoseS'
