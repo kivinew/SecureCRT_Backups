@@ -9,10 +9,8 @@ def main():
 	
 	memBuffer = pyperclip.paste()
 	
-	if memBuffer:
-
-		sendRequest = f"show route {memBuffer}\n \n"
-
-		crt.Screen.Send(sendRequest)
+	sendRequest = f"file delete \"{memBuffer}\"\r"
 	
+	crt.Screen.Send(sendRequest)
+
 main()

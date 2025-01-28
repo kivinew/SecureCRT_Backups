@@ -1,6 +1,8 @@
 # $language = "Python3"
 # $interface = "1.0"
 
+# Для проверки по серийнику, скопировать его в буфер обмена 
+
 import pyperclip
 
 crt.Screen.Synchronous = True	
@@ -14,6 +16,8 @@ def main():
 		crt.Screen.Send("display ont info by-sn ")
 		return
 
-	crt.Screen.Send(f"display ont info by-sn {memBuffer}\rq")
+	crt.Screen.Send(f"display ont info by-sn {memBuffer}\r")
+	if (crt.Screen.WaitForString("---- More ( Press 'Q' to break ) ----", 2) == 1):
+		crt.Screen.Send("q")
 
 main()

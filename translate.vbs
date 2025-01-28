@@ -24,14 +24,14 @@ Sub Main
  End If
 
  ' Now search on Google for the information.
- g_strSearchBase = "http://www.google.com/search?hl=ru&q="
+ g_strSearchBase = "https://www.deepl.com/translator#en/ru/"
 
  Set g_shell = CreateObject("WScript.Shell")
 
  ' Instead of launching Internet Explorer, we'll run the URL, so that the
  ' default browser gets used :).
  If strSelection = "" Then
- g_shell.Run chr(34) & "http://www.google.com/" & chr(34)
+ g_shell.Run chr(34) & "https://www.deepl.com/translator#en/ru/" & chr(34)
  Else
  g_shell.Run chr(34) & g_strSearchBase & strSelection & chr(34)
  End If

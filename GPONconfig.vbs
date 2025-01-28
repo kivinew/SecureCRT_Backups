@@ -24,11 +24,11 @@ status=true
 '########################################################################################################'
 ' Указать slot, port, ont и имя файла для заливки'
 ' frame = 0 всегда'
-slot        = "1"
-port        = "1"
-ont         = "52"
-conf        = "IP"
-description = "fl_81666"
+slot        = "10"
+port        = "0"
+ont         = "6"
+conf        = ""
+description = ""
 '########################################################################################################'
 
 Sub Main()
@@ -56,13 +56,16 @@ Sub Main()
 ' Завершение конфигурации в режиме diagnoseS'
 	crt.Screen.Send "ont-load stop" & vbcr
 	crt.Screen.Send	"config" & vbcr
-	crt.Screen.Send "interface gpon 0/" + slot & vbcr
+
 ' Если конфига с пропиской IP то вывести настройки WAN интерфейса'    
 	if conf = "all" or conf = "IP" or conf = "inet_tv_wifi_vlan2" then
-		crt.Screen.Send "display ont wan-info " + port + " " + ont & vbcr
+		crt.Screen.Send "display ont wan-info 0/" + slot + " " + port + " " + ont & vbcr
+		crt.Screen.Send " " & vbcr
 	end if
-	crt.Screen.WaitForString(")#")
-	crt.Screen.Send "ont modify " + port + " " + ont + " desc " + description & vbcr
+	crt.Screen.Send "interface gpon 0/" + slot & vbcr
+	if description <> "" then
+		crt.Screen.Send "ont modify " + port + " " + ont + " desc " + description & vbcr
+	end if
 	crt.Screen.Send "ont remote-ping " + port + " " + ont + " ip-address 8.8.8.8" & vbcr
 	crt.Screen.Send "quit" & vbcr
 End Sub

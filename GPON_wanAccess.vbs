@@ -32,7 +32,7 @@ def main():
 
 	# файл конфигурации
 	conf: str
-
+	# WanAccess WanAccess_HG8245
 	conf = "WanAccess"
 
 	crt.Screen.Send("diagnose" + chr(13))
@@ -47,16 +47,15 @@ def main():
 		crt.Screen.Send("display ont-load select 0/" + slot + " " + port + " " + ont + chr(13))
 		condition = crt.Screen.WaitForString("Success", 1)		#### Ошибка Python AN INTEGER IS REQUIRED!!!
 		#crt.Dialog.MessageBox(str(condition))
-		match condition:
-			case 1:
-				status = False
-			case 2:
-				# Сбой конфигурации - выход из цикла опроса
-				status = False
-				crt.Dialog.MessageBox("Сбой конфигурации!!!")
-			case 0:
-				# Пауза 2 сек'
-				crt.Sleep(1000)
+		if condition == 1:
+			status = False
+		elif condition == 2:
+			# Сбой конфигурации - выход из цикла опроса
+			status = False
+			crt.Dialog.MessageBox("Сбой конфигурации!!!")
+		elif condition == 0:
+			# Пауза 2 сек'
+			crt.Sleep(1000)
 
 	# Завершение конфигурации в режиме diagnose
 	crt.Screen.Send("ont-load stop" + chr(13))

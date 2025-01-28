@@ -9,4 +9,5 @@ def main():
 	memBuffer = pyperclip.paste()
 
 	crt.Screen.Send ("show subscriber session | include " + memBuffer + chr(13))
+	crt.Screen.Send ("show subscriber session username " + memBuffer + chr(13))
 main()

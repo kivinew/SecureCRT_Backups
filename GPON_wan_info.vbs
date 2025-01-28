@@ -7,7 +7,7 @@ crt.Screen.Synchronous = True
 
 def main():
 	
-	memBuffer = pyperclip.paste()
+	memBuffer = pyperclip.paste().strip()
 
 	ONT = memBuffer.replace('/', ' ').split()
 
@@ -17,7 +17,7 @@ def main():
 	ont: str   = ONT[3]
 	
 	
-	crt.Screen.Send(f'display ont wan-info {frame}/{slot} {port} {ont}\r')
+	crt.Screen.Send(f'display ont wan-info {frame}/{slot} {port} {ont}\r ')
 	crt.Sleep(1000)
 
 main()

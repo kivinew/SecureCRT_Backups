@@ -11,7 +11,7 @@ def main():
 	
 	if memBuffer:
 
-		sendRequest = f"show route {memBuffer}\n \n"
+		sendRequest = "traceroute monitor " + memBuffer + chr(13)
 
 		crt.Screen.Send(sendRequest)
 	

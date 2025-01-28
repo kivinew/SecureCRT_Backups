@@ -1,6 +1,8 @@
 # $language = "Python3"
 # $interface = "1.0"
 
+# Для работы скрипта скопируй последние 4 символа мак-адреса
+
 import pyperclip
 
 crt.Screen.Synchronous = True	
@@ -12,9 +14,7 @@ def main():
 	split_chars = '.-: '
 
 	mac = strSelection.translate(str.maketrans('', '', split_chars))
-
-	find_str = "display mac-address all | include " + mac + "\r"
 	
-	crt.Screen.Send(find_str)
+	crt.Screen.Send(f'show mac address-table | include {mac}\r')
 	
 main()

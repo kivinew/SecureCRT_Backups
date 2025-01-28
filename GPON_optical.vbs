@@ -1,6 +1,8 @@
 # $language = "Python3"
 # $interface = "1.0"
 
+# Для работы скрипта скопируй 4 параметра ONT ( пример: 0/1/1 1 )
+
 import pyperclip
 
 crt.Screen.Synchronous = True	
