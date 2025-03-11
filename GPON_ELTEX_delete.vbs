@@ -62,8 +62,24 @@ def delete_user(user_name):
         crt.Screen.WaitForString('(acs)#', 1)
         crt.Screen.Send('user\r')
         crt.Screen.Send(f'delete user {user_name}\r')
+        
+        # Ожидаем вывод команды и проверяем на наличие ошибки
+        output = crt.Screen.ReadString('(acs-user)#', 1)
+        
+        if "ERROR: Subscriber" in output and "doesn't exists" in output:
+            # Если ошибка, меняем приставку "fl_" на "kes"
+            new_user_name = user_name.replace("fl_", "kes")
+            crt.Screen.Send(f'delete user {new_user_name}\r')
+            output = crt.Screen.ReadString('(acs-user)#', 1)
+            
+            # Проверяем, успешно ли удалился пользователь с новым именем
+            if "ERROR" in output:
+                crt.Dialog.MessageBox(f"Не удалось удалить пользователя {new_user_name}", "Ошибка")
+                return
+        
         crt.Screen.Send('commit\r')
         crt.Screen.Send('exit\r')
+        crt.Screen.WaitForString('(acs)#', 1)
         crt.Screen.Send('exit\r')
 
 def main():

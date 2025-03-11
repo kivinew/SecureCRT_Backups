@@ -32,8 +32,11 @@ def main():
 
 	# файл конфигурации
 	conf: str
-	# WanAccess WanAccess_HG8245
-	conf = "WanAccess"
+	# присвоить 1, если нужен WanAccess.xml
+	# приствоить 0, если нужен WanAccess_HG8245
+	access = 1
+
+	conf = "WanAccess" if access == 1 else "WanAccess_HG8245"
 
 	crt.Screen.Send("diagnose" + chr(13))
 	crt.Screen.Send("ont-load info configuration " + conf + ".xml ftp 10.2.1.3 huawei ksa5oz6y" + chr(13))

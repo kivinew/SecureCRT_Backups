@@ -3,6 +3,11 @@
 import time
 import pyperclip
 import re
+import subprocess
+
+crt.Screen.Synchronous = True   
+
+path: str = 'C:\\Program Files\\VideoLAN\\VLC\\vlc.exe'
 
 # Функция для проверки, является ли строка IP-адресом
 def is_ip_address(address):
@@ -47,6 +52,15 @@ def main():
         if is_multicast_address(content):
             # Выполнение команды для адреса мультикаста
             crt.Screen.Send(f"show route table inet.1 | match {content}\n")
+            # Список аргументов для запуска VLC в свернутом виде и без отображения заголовка видео
+            args = [
+                "--qt-start-minimized", # Запуск VLC в свернутом виде
+                "--no-video-title-show",
+                "--repeat",
+                f"udp://@{content}:1234"
+                ]
+            # Запускаем VLC с передачей аргументов
+            process = subprocess.Popen([path] + args)
         else:
             # Выполнение команды show route для обычного IP-адреса
             crt.Screen.Send(f'\nshow route {content}\n')
