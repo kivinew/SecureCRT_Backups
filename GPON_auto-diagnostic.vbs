@@ -4,36 +4,20 @@
 import pyperclip
 import re
 import traceback
+from typing import Dict, List, Tuple, Optional
 
 crt.Screen.Synchronous = True
 
 # Строковые константы
 COMMANDS = {
+    'info_by_serial': "display ont info by-sn {serial}",
     'ont_info': "display ont info {frame} {slot} {port} {ont}",
     'ont_version': "display ont version {frame} {slot} {port} {ont}",
     'gpon_iface': "interface gpon {frame}/{slot}",
     'optical_info': "display ont optical-info {port} {ont}",
-    'ont_line_quality': "statistics ont-line-quality {port} {ont}",
+    'ont_line_quality': "{command} statistics ont-line-quality {port} {ont}",
     'eth_ports': "display ont port state {port} {ont} eth-port all",
-    'eth_errors': "display statistics ont-eth {port} {ont} ont-port {lan_id}"
-}
-
-# Словарь для хранения извлеченных данных
-parsed_data = { 
-    "status": "offline", 
-    "serial": "нет данных", 
-    "model": "нет данных", 
-    "version": "нет данных", 
-    "distance": "нет данных", 
-    "uptime": "нет данных", 
-    "downtime": "нет данных", 
-    "down_cause": "нет данных", 
-    "ont_rx_power": "нет данных", 
-    "olt_rx_power": "нет данных", 
-    "upstream_errors": "0", 
-    "downstream_errors": "0",
-    "lan_ports": [], 
-    "eth_errors": []
+    'eth_errors': "{command} statistics ont-eth {port} {ont} ont-port {lan_id}"
 }
 
 # Регулярные выражения для извлечения данных
@@ -54,135 +38,127 @@ PATTERNS = {
     'downstream_errors': r"Downstream frame BIP error count\s*:\s*(\d+)",
     'eth_errors': {
         'fcs': r"Received FCS error frames\s+:\s+(\d+)",
-        'bad_bytes': r"Received bad bytes\s+:\s+(\d+)",
+        'received_bad_bytes': r"Received bad bytes\s+:\s+(\d+)",
         'sent_bad_bytes': r"Sent bad bytes\s+:\s+(\d+)"
     }
 }
 
-def check_prompt(expected_prompt):
-    """Функция для проверки текущего приглашения"""
-    crt.Screen.Send("\n")
-    last_line = crt.Screen.ReadString("#") 
-    if expected_prompt in last_line.strip():
-        return True
-    return False
+# Инициализация данных с типизацией
+ParsedData = Dict[str, str | int | float | List[dict]]
+parsed_data: ParsedData = {
+    "status": "offline",
+    "serial": "нет данных",
+    "model": "нет данных",
+    "version": "нет данных",
+    "distance": "нет данных",
+    "uptime": "нет данных",
+    "downtime": "нет данных",
+    "down_cause": "нет данных",
+    "ont_rx_power": "нет данных",
+    "olt_rx_power": "нет данных",
+    "upstream_errors": "0",
+    "downstream_errors": "0",
+    "lan_ports": [],
+    "eth_errors": {"fcs": 0, "received_bad_bytes": 0, "sent_bad_bytes": 0}
+}
 
-def send_command(command):
+def send_command(command: str) -> str:
     """Выполнение команды и возврат её вывода."""
-    if "statistics" in command:
-        crt.Send("display ")
     crt.Screen.Send(command + "\r")
-    
-    # Если команда требует постраничного вывода (например, "display ont info")
-    if ("display ont info" in command) & (not "by-desc" in command):
-        crt.Screen.Send("q")  # Отправляем 'q' для выхода из постраничного вывода.
-    elif "optical-info" or "ont-eth" in command:
-        crt.Screen.Send(' ')  # отправляем " " для полного вывода
+    if "display ont info" in command and "by-desc" not in command:
+        crt.Screen.Send("q")  # Выход из постраничного вывода
+    elif "optical-info" in command or "ont-eth" in command:
+        crt.Screen.Send(" ")  # Полный вывод
     return read_output()
 
-# Функция для чтения вывода
-def read_output():
+def read_output() -> str:
+    """Чтение вывода терминала построчно с таймаутом."""
     output = ""
     while True:
-        line = crt.Screen.ReadString("\n", 1)
+        line = crt.Screen.ReadString("\n", 1)  # Таймаут 1 секунда
         if not line:
             break
         output += line
     return output
 
-def parse_output(output, pattern, transform=lambda x: x):
-    """Функция для парсинга выводов с регулярными выражениями."""
+def parse_output(output: str, pattern: str, transform=lambda x: x) -> Optional[str | int | float]:
+    """Парсинг вывода с использованием регулярных выражений."""
     match = re.search(pattern, output)
-    if match:
-        return transform(match.group(1))
-    return None
+    return transform(match.group(1)) if match else None
 
-def parse_by_desc(output):
-    """Парсит вывод команды display ont info by-desc и извлекает frame, slot, port и ont."""
-    # Регулярное выражение для поиска строки с frame/slot/port и ont
-    pattern = r"(\d+)/\s*(\d+)/\s*(\d+)\s+(\d+)"
-    match = re.search(pattern, output)
-    
+def parse_by_desc(output: str) -> Tuple[str, str, str, str]:
+    """Извлечение frame, slot, port и ont из вывода команды display ont info by-desc."""
+    match = re.search(PATTERNS['ont_info'], output)
     if match:
-        frame = match.group(1)
-        slot = match.group(2)
-        port = match.group(3)
-        ont = match.group(4)
-        return frame, slot, port, ont
-    else:
-        raise ValueError("Не удалось найти данные ONT по дескрипшену!")  
+        return match.groups()
+    raise ValueError("Не удалось найти данные ONT по дескрипшену!")
 
-def parse_lan_ports(output):
+def parse_lan_ports(output: str) -> List[Dict[str, str]]:
     """Парсинг состояния LAN портов."""
-    lan_ports = []
-    for match in re.finditer(PATTERNS['lan_ports'], output):
-        lan_ports.append({
+    return [
+        {
             "lan_id": match.group(2),
             "port_type": match.group(3),
             "speed": match.group(4),
             "duplex": match.group(5),
             "link_state": match.group(6),
-        })
-    return lan_ports
+        }
+        for match in re.finditer(PATTERNS['lan_ports'], output)
+    ]
 
-def parse_eth_errors(output):
+def parse_eth_errors(output: str) -> Dict[str, int]:
     """Парсинг ошибок Ethernet."""
-    eth_errors = {}
-    for key, pattern in PATTERNS['eth_errors'].items():
-        eth_errors[key] = parse_output(output, pattern, int) or 0
-    return eth_errors
+    return {
+        key: parse_output(output, pattern, int) or 0
+        for key, pattern in PATTERNS['eth_errors'].items()
+    }
 
-def main():
-    memBuffer = pyperclip.paste().strip()
-    if not memBuffer:
-        crt.Dialog.MessageBox("Буфер обмена пуст.")
-        return
-
+def main() -> None:
+    """Основная логика скрипта."""
     try:
-        
-        #   Выход из interface gpon
-        if not check_prompt("(config)"):
-            crt.Screen.Send(f"quit\r")
-        
-        # Проверка типа введённых данных
-        if re.match(r'^\d+$', memBuffer):
-            # crt.Screen.Send(f"display ont info by-desc {memBuffer}\r")
-            output = send_command(f"display ont info by-desc {memBuffer}")
+        mem_buffer = pyperclip.paste().strip()
+        if not mem_buffer:
+            crt.Dialog.MessageBox("Буфер обмена пуст.")
+            return
+
+        # Выход из interface gpon, если нужно
+        crt.Screen.Send("\n")
+        last_line = crt.Screen.ReadString("#", 1)
+        if "(config)" not in last_line.strip():
+            crt.Screen.Send("quit\r")
+
+        # Определение frame, slot, port, ont
+        if re.match(r'^\d+$', mem_buffer):
+            output = send_command(f"display ont info by-desc {mem_buffer}")
             frame, slot, port, ont = parse_by_desc(output)
         else:
-            ONT = memBuffer.replace('/', ' ').split()
-            if len(ONT) != 4:
+            ont_data = mem_buffer.replace('/', ' ').split()
+            if len(ont_data) != 4:
                 raise ValueError("Некорректный формат адреса ONT.")
-            frame, slot, port, ont = ONT
+            frame, slot, port, ont = ont_data
 
-        #   Заполняем данные для буфера
-        #   указываем адрес ONT
-        clipboard_data = f'ONT = "{frame}/{slot}/{port} {ont}\n"'
+        # Инициализация буфера обмена
+        clipboard_data = f"ONT = {frame}/{slot}/{port} {ont}\n"
 
-
-        # Выполняем команды ont_info и ont_version
+        # Сбор базовой информации
         output_ont_info = send_command(COMMANDS['ont_info'].format(frame=frame, slot=slot, port=port, ont=ont))
-        parsed_data['status'] = parse_output(output_ont_info, PATTERNS['status']) or parsed_data['status']
-        parsed_data['serial'] = parse_output(output_ont_info, PATTERNS['serial']) or parsed_data['serial']
-        parsed_data['uptime'] = parse_output(output_ont_info, PATTERNS['uptime']) or parsed_data['uptime']
-        parsed_data['downtime'] = parse_output(output_ont_info, PATTERNS['downtime']) or parsed_data['downtime']
-        parsed_data['down_cause'] = parse_output(output_ont_info, PATTERNS['down_cause']) or parsed_data['down_cause']
+        for key in ['status', 'serial', 'uptime', 'downtime', 'down_cause']:
+            parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
         parsed_data['distance'] = parse_output(output_ont_info, PATTERNS['distance'], int) or parsed_data['distance']
 
-        # Собираем версию и модель
         output_version = send_command(COMMANDS['ont_version'].format(frame=frame, slot=slot, port=port, ont=ont))
         parsed_data['version'] = parse_output(output_version, PATTERNS['ont_version']) or parsed_data['version']
         parsed_data['model'] = parse_output(output_version, PATTERNS['ont_model']) or parsed_data['model']
 
-        #   Переходим в interface gpon
+        # Переход в interface gpon
         crt.Screen.Send(f"interface gpon {frame}/{slot}\r")
 
-        #   Парсинг уровней оптического сигнала
+        # Оптическая информация
         output_optical_info = send_command(COMMANDS['optical_info'].format(port=port, ont=ont))
         parsed_data['ont_rx_power'] = parse_output(output_optical_info, PATTERNS['ont_rx_power'], float) or parsed_data['ont_rx_power']
         parsed_data['olt_rx_power'] = parse_output(output_optical_info, PATTERNS['olt_rx_power'], float) or parsed_data['olt_rx_power']
 
-        #   Формируем строку для буфера обмена
+        # Формирование строки базовой информации
         clipboard_data += (
             f"PON SN = {parsed_data['serial']}\n"
             f"Модель терминала: '{parsed_data['model']}'\n"
@@ -193,52 +169,59 @@ def main():
             f"Время последнего включения: {parsed_data['uptime']}\n"
         )
 
-        #   Парисинг ошибок оптики
-        output_optical_errors = send_command(COMMANDS['ont_line_quality'].format(port=port, ont=ont))
-        parsed_data['upstream_errors'] = parse_output(output_optical_errors, PATTERNS['upstream_errors'], int) or parsed_data['upstream_errors']
-        parsed_data['downstream_errors'] = parse_output(output_optical_errors, PATTERNS['downstream_errors'], int) or parsed_data['downstream_errors']
-        
-        #   Парсинг LAN портов
-        output_lan_ports = send_command(COMMANDS['eth_ports'].format(port=port, ont=ont))
-        parsed_data['lan_ports'] = parse_lan_ports(output_lan_ports)
-        for port_state in parsed_data.get("lan_ports", []):
-            if port_state['link_state'] == 'up':  # Проверяем состояние порта
-                # прибавляю к буферу состояние активных LAN портов
-                clipboard_data += (f"LAN{port_state['lan_id']}: Type= {port_state['port_type']}, Speed={port_state['speed']} Mbps, "
-                f"Duplex={port_state['duplex']}, Link State={port_state['link_state']}\n")
-
-                #   Обработка ошибок Ethernet
-                output_eth_errors = send_command(COMMANDS['eth_errors'].format(port=port, ont=ont, lan_id=port_state['lan_id']))
-                parsed_data['eth_errors'] = parse_eth_errors(output_eth_errors)
-
-        crt.Dialog.MessageBox(str(parsed_data['eth_errors']))
-
-
-        #   Добавляем ошибки оптики только если значение не равно нулю
-        errors = int(parsed_data['upstream_errors']) + int(parsed_data['downstream_errors'])
-        if errors != 0:
-            if errors > 10000:
-                clipboard_data += "Обнаружено значительное количество ошибок оптики: "
-            else:
-                clipboard_data += "Незначительное количество ошибок оптики: "
+        # Ошибки оптики
+        output_optical_errors = send_command(COMMANDS['ont_line_quality'].format(command='display', port=port, ont=ont))
+        parsed_data['upstream_errors'] = parse_output(output_optical_errors, PATTERNS['upstream_errors'], int) or 0
+        parsed_data['downstream_errors'] = parse_output(output_optical_errors, PATTERNS['downstream_errors'], int) or 0
+        optic_errors = parsed_data['upstream_errors'] + parsed_data['downstream_errors']
+        if optic_errors:
+            prefix = "Обнаружено значительное количество ошибок оптики: " if optic_errors > 10000 else "Незначительное количество ошибок оптики: "
             clipboard_data += (
+                f"{prefix}"
                 f"Upstream: {parsed_data['upstream_errors']}. "
-                f"Downstream: {parsed_data['downstream_errors']}."
-                "\nВыполнен сброс счётчиков ошибок.\n"
+                f"Downstream: {parsed_data['downstream_errors']}.\n"
+                "Выполнен сброс счётчиков ошибок.\n"
             )
-            #   сбрасываю ошибки оптики
-            crt.Screen.Send(f"clear {ontLineQuality} {port} {ont}\r")
+            send_command(COMMANDS['ont_line_quality'].format(command='clear', port=port, ont=ont))
         else:
             clipboard_data += "Ошибок оптики нет.\n"
+
+        # LAN порты и ошибки Ethernet
+        output_lan_ports = send_command(COMMANDS['eth_ports'].format(port=port, ont=ont))
+        parsed_data['lan_ports'] = parse_lan_ports(output_lan_ports)
+        ethernet_counters = ""
+        has_eth_errors = False
+
+        for port_state in parsed_data['lan_ports']:
+            if port_state['link_state'] == 'up':
+                clipboard_data += (
+                    f"LAN{port_state['lan_id']}: Type={port_state['port_type']}, "
+                    f"Speed={port_state['speed']} Mbps, Duplex={port_state['duplex']}, "
+                    f"Link State={port_state['link_state']}\n"
+                )
+                output_eth_errors = send_command(COMMANDS['eth_errors'].format(command='display', port=port, ont=ont, lan_id=port_state['lan_id']))
+                parsed_data['eth_errors'] = parse_eth_errors(output_eth_errors)
+                errors = parsed_data['eth_errors']
+                if any(errors.values()):
+                    has_eth_errors = True
+                    ethernet_counters += (
+                        f"Обнаружены ошибки на порту LAN{port_state['lan_id']}: "
+                        f"FCS = {errors['fcs']}. "
+                        f"Input = {errors['received_bad_bytes']}. "
+                        f"Output = {errors['sent_bad_bytes']}.\n"
+                    )
+                    send_command(COMMANDS['eth_errors'].format(command='clear', port=port, ont=ont, lan_id=port_state['lan_id']))
+        clipboard_data += ethernet_counters + "Выполнен сброс счётчиков ошибок.\n" if has_eth_errors else "Ошибок портов LAN нет.\n"
         
-        # Формируем строку для буфера обмена
+        # Покидаем interface gpon
+        send_command("quit")
+
+        # Копирование в буфер
         pyperclip.copy(clipboard_data)
 
-    except ValueError as e:
-        error_line = traceback.extract_tb(e.__traceback__)[-1].lineno
-        crt.Dialog.MessageBox(f"Ошибка в строке {error_line}: {e}")
     except Exception as e:
         error_line = traceback.extract_tb(e.__traceback__)[-1].lineno
-        crt.Dialog.MessageBox(f"Неизвестная ошибка в строке {error_line}: {e}")
+        msg = f"Ошибка в строке {error_line}: {e}"
+        crt.Dialog.MessageBox(msg)
 
 main()
