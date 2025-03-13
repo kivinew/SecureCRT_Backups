@@ -1,6 +1,10 @@
 # $language = "Python3"
 # $interface = "1.0"
 
+# TODO:
+# пинг 8.8.8.8
+# mac-address ont
+
 import pyperclip
 import re
 import traceback
@@ -211,6 +215,7 @@ def main() -> None:
                         f"Output = {errors['sent_bad_bytes']}.\n"
                     )
                     send_command(COMMANDS['eth_errors'].format(command='clear', port=port, ont=ont, lan_id=port_state['lan_id']))
+        
         clipboard_data += ethernet_counters + "Выполнен сброс счётчиков ошибок.\n" if has_eth_errors else "Ошибок портов LAN нет.\n"
         
         # Покидаем interface gpon

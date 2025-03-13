@@ -25,8 +25,8 @@ status=true
 ' Указать slot, port, ont и имя файла для заливки'
 ' frame = 0 всегда'
 slot        = "10"
-port        = "9"
-ont         = "10"
+port        = "1"
+ont         = "17"
 file        = "IP"
 description = ""
 '########################################################################################################'
@@ -47,7 +47,7 @@ Sub Main()
 			Case 2
 				' Сбой конфигурации - выход из цикла опроса
 				status=false
-				crt.Dialog.MessageBox("Сбой конфигурации")
+				crt.Dialog.MessageBox("Configuration error!")
 			Case Else
 				' Пауза 2 сек'
 				crt.Sleep 2000
