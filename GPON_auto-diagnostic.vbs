@@ -2,6 +2,9 @@
 # $interface = "1.0"
 
 # TODO:
+
+# проверка массовости
+# при отсутствии линков на LAN портах, запись об ошибках LAN не нужна
 # пинг 8.8.8.8
 # mac-address ont
 
@@ -32,7 +35,8 @@ PATTERNS = {
     'uptime': r"Last up time\s*:\s*([\d-]+\s[\d:+-]+)",
     'downtime': r"Last down time\s*:\s*([\d-]+\s[\d:+-]+)",
     'down_cause': r"Last down cause\s+:\s+(dying-gasp|LOS)",
-    'distance': r"ONT distance\(m\)\s*:\s*(\d+)",
+    'distance': r" distance\(m\)\s*:\s*(\d+)",
+    'distance_last': r"",
     'ont_version': r"Main Software Version\s*:\s*(\S*)",
     'ont_model': r"OntProductDescription    : EchoLife (\S+) GPON",
     'ont_rx_power': r"Rx optical power\(dBm\)\s*:\s*([\d.-]+)",
@@ -122,7 +126,7 @@ def main() -> None:
     try:
         mem_buffer = pyperclip.paste().strip()
         if not mem_buffer:
-            crt.Dialog.MessageBox("Буфер обмена пуст.")
+            raise Exception("Буфер обмена пуст.")
             return
 
         # Выход из interface gpon, если нужно
@@ -148,78 +152,100 @@ def main() -> None:
         output_ont_info = send_command(COMMANDS['ont_info'].format(frame=frame, slot=slot, port=port, ont=ont))
         for key in ['status', 'serial', 'uptime', 'downtime', 'down_cause']:
             parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
-        parsed_data['distance'] = parse_output(output_ont_info, PATTERNS['distance'], int) or parsed_data['distance']
-
-        output_version = send_command(COMMANDS['ont_version'].format(frame=frame, slot=slot, port=port, ont=ont))
-        parsed_data['version'] = parse_output(output_version, PATTERNS['ont_version']) or parsed_data['version']
-        parsed_data['model'] = parse_output(output_version, PATTERNS['ont_model']) or parsed_data['model']
-
-        # Переход в interface gpon
-        crt.Screen.Send(f"interface gpon {frame}/{slot}\r")
-
-        # Оптическая информация
-        output_optical_info = send_command(COMMANDS['optical_info'].format(port=port, ont=ont))
-        parsed_data['ont_rx_power'] = parse_output(output_optical_info, PATTERNS['ont_rx_power'], float) or parsed_data['ont_rx_power']
-        parsed_data['olt_rx_power'] = parse_output(output_optical_info, PATTERNS['olt_rx_power'], float) or parsed_data['olt_rx_power']
-
-        # Формирование строки базовой информации
-        clipboard_data += (
-            f"PON SN = {parsed_data['serial']}\n"
-            f"Модель терминала: '{parsed_data['model']}'\n"
-            f"Версия ПО терминала: '{parsed_data['version']}'\n"
-            f"Растояние от головной станции (м): {parsed_data['distance']}\n"
-            f"ONT Rx (оптический сигнал на терминале)(dBm): {parsed_data['ont_rx_power']}\n"
-            f"OLT Rx (сигнал на головной станции)(dBm): {parsed_data['olt_rx_power']}\n"
-            f"Время последнего включения: {parsed_data['uptime']}\n"
-        )
-
-        # Ошибки оптики
-        output_optical_errors = send_command(COMMANDS['ont_line_quality'].format(command='display', port=port, ont=ont))
-        parsed_data['upstream_errors'] = parse_output(output_optical_errors, PATTERNS['upstream_errors'], int) or 0
-        parsed_data['downstream_errors'] = parse_output(output_optical_errors, PATTERNS['downstream_errors'], int) or 0
-        optic_errors = parsed_data['upstream_errors'] + parsed_data['downstream_errors']
-        if optic_errors:
-            prefix = "Обнаружено значительное количество ошибок оптики: " if optic_errors > 10000 else "Незначительное количество ошибок оптики: "
+        
+        if parsed_data['down_cause'] == 'dying-gasp':
+            parsed_data['down_cause'] += ' – отключение электропитания. Необходима проверка терминала и БП.'
+        elif parsed_data['down_cause'] == 'LOS' or 'LOSi/LOBi':
+            parsed_data['down_cause'] += ' – отсутствует оптический сигнал. Необходима проверка оптической линии.'
+        elif parsed_data['down_cause'] == 'LOFi':
+            parsed_data['down_cause'] += ' – низкий/отсутствует уровень оптического сигнала. Необходима проверка оптической линии.'
+         
+        if parsed_data['status'] == 'offline':
+            parsed_data['distance'] = parse_output(output_ont_info, PATTERNS['distance'], int) or parsed_data['distance']
             clipboard_data += (
-                f"{prefix}"
-                f"Upstream: {parsed_data['upstream_errors']}. "
-                f"Downstream: {parsed_data['downstream_errors']}.\n"
-                "Выполнен сброс счётчиков ошибок.\n"
-            )
-            send_command(COMMANDS['ont_line_quality'].format(command='clear', port=port, ont=ont))
-        else:
-            clipboard_data += "Ошибок оптики нет.\n"
-
-        # LAN порты и ошибки Ethernet
-        output_lan_ports = send_command(COMMANDS['eth_ports'].format(port=port, ont=ont))
-        parsed_data['lan_ports'] = parse_lan_ports(output_lan_ports)
-        ethernet_counters = ""
-        has_eth_errors = False
-
-        for port_state in parsed_data['lan_ports']:
-            if port_state['link_state'] == 'up':
-                clipboard_data += (
-                    f"LAN{port_state['lan_id']}: Type={port_state['port_type']}, "
-                    f"Speed={port_state['speed']} Mbps, Duplex={port_state['duplex']}, "
-                    f"Link State={port_state['link_state']}\n"
+                f"PON SN = {parsed_data['serial']}\n"
+                f"Растояние от головной станции (м): {parsed_data['distance']}\n"
+                f"Время последнего включения: {parsed_data['uptime']}\n"
+                f"Время отключения: {parsed_data['downtime']}\n"
+                f"Причина отключения — {parsed_data['down_cause']}"
                 )
-                output_eth_errors = send_command(COMMANDS['eth_errors'].format(command='display', port=port, ont=ont, lan_id=port_state['lan_id']))
-                parsed_data['eth_errors'] = parse_eth_errors(output_eth_errors)
-                errors = parsed_data['eth_errors']
-                if any(errors.values()):
-                    has_eth_errors = True
-                    ethernet_counters += (
-                        f"Обнаружены ошибки на порту LAN{port_state['lan_id']}: "
-                        f"FCS = {errors['fcs']}. "
-                        f"Input = {errors['received_bad_bytes']}. "
-                        f"Output = {errors['sent_bad_bytes']}.\n"
+        else:
+            parsed_data['distance'] = parse_output(output_ont_info, PATTERNS['distance'], int) or parsed_data['distance']
+            
+        if parsed_data['status'] == 'online':
+            output_version = send_command(COMMANDS['ont_version'].format(frame=frame, slot=slot, port=port, ont=ont))
+            parsed_data['version'] = parse_output(output_version, PATTERNS['ont_version']) or parsed_data['version']
+            parsed_data['model'] = parse_output(output_version, PATTERNS['ont_model']) or parsed_data['model']
+
+            # Формирование строки базовой информации
+            clipboard_data += (
+                f"PON SN = {parsed_data['serial']}\n"
+                f"Модель терминала: '{parsed_data['model']}'\n"
+                f"Версия ПО терминала: '{parsed_data['version']}'\n"
+                f"Растояние от головной станции (м): {parsed_data['distance']}\n"
+                f"Время последнего включения: {parsed_data['uptime']}\n"
+                )
+            
+            # Переход в interface gpon
+            crt.Screen.Send(f"interface gpon {frame}/{slot}\r")
+
+            # Оптическая информация
+            output_optical_info = send_command(COMMANDS['optical_info'].format(port=port, ont=ont))
+            parsed_data['ont_rx_power'] = parse_output(output_optical_info, PATTERNS['ont_rx_power'], float) or parsed_data['ont_rx_power']
+            parsed_data['olt_rx_power'] = parse_output(output_optical_info, PATTERNS['olt_rx_power'], float) or parsed_data['olt_rx_power']
+
+            clipboard_data += (
+                f"ONT Rx (оптический сигнал на терминале)(dBm): {parsed_data['ont_rx_power']}\n"
+                f"OLT Rx (сигнал на головной станции)(dBm): {parsed_data['olt_rx_power']}\n"
+            )
+
+            # Ошибки оптики
+            output_optical_errors = send_command(COMMANDS['ont_line_quality'].format(command='display', port=port, ont=ont))
+            parsed_data['upstream_errors'] = parse_output(output_optical_errors, PATTERNS['upstream_errors'], int) or 0
+            parsed_data['downstream_errors'] = parse_output(output_optical_errors, PATTERNS['downstream_errors'], int) or 0
+            optic_errors = parsed_data['upstream_errors'] + parsed_data['downstream_errors']
+            if optic_errors:
+                prefix = "Обнаружено значительное количество ошибок оптики: " if optic_errors > 10000 else "Незначительное количество ошибок оптики: "
+                clipboard_data += (
+                    f"{prefix}"
+                    f"Upstream: {parsed_data['upstream_errors']}. "
+                    f"Downstream: {parsed_data['downstream_errors']}.\n"
+                    "Выполнен сброс счётчиков ошибок.\n"
+                )
+                send_command(COMMANDS['ont_line_quality'].format(command='clear', port=port, ont=ont))
+            else:
+                clipboard_data += "Ошибок оптики нет.\n"
+
+            # LAN порты и ошибки Ethernet
+            output_lan_ports = send_command(COMMANDS['eth_ports'].format(port=port, ont=ont))
+            parsed_data['lan_ports'] = parse_lan_ports(output_lan_ports)
+            ethernet_counters = ""
+            has_eth_errors = False
+
+            for port_state in parsed_data['lan_ports']:
+                if port_state['link_state'] == 'up':
+                    clipboard_data += (
+                        f"LAN{port_state['lan_id']}: Type={port_state['port_type']}, "
+                        f"Speed={port_state['speed']} Mbps, Duplex={port_state['duplex']}, "
+                        f"Link State={port_state['link_state']}\n"
                     )
-                    send_command(COMMANDS['eth_errors'].format(command='clear', port=port, ont=ont, lan_id=port_state['lan_id']))
-        
-        clipboard_data += ethernet_counters + "Выполнен сброс счётчиков ошибок.\n" if has_eth_errors else "Ошибок портов LAN нет.\n"
-        
-        # Покидаем interface gpon
-        send_command("quit")
+                    output_eth_errors = send_command(COMMANDS['eth_errors'].format(command='display', port=port, ont=ont, lan_id=port_state['lan_id']))
+                    parsed_data['eth_errors'] = parse_eth_errors(output_eth_errors)
+                    errors = parsed_data['eth_errors']
+                    if any(errors.values()):
+                        has_eth_errors = True
+                        ethernet_counters += (
+                            f"Обнаружены ошибки на порту LAN{port_state['lan_id']}: "
+                            f"FCS = {errors['fcs']}. "
+                            f"Input = {errors['received_bad_bytes']}. "
+                            f"Output = {errors['sent_bad_bytes']}.\n"
+                        )
+                        send_command(COMMANDS['eth_errors'].format(command='clear', port=port, ont=ont, lan_id=port_state['lan_id']))
+            
+            clipboard_data += ethernet_counters + "Выполнен сброс счётчиков ошибок.\n" if has_eth_errors else "Ошибок портов LAN нет.\n"
+            
+            # Покидаем interface gpon
+            send_command("quit")
 
         # Копирование в буфер
         pyperclip.copy(clipboard_data)
