@@ -256,10 +256,10 @@ def main() -> None:
                         send_command(COMMANDS['eth_errors'].format(command='clear', port=port, ont=ont, lan_id=port_state['lan_id']))
             
             clipboard_data += ethernet_counters + "Выполнен сброс счётчиков ошибок.\n" if has_eth_errors else "Ошибок портов LAN нет.\n"
-            
+
             # Пинг до 8.8.8.8
             send_command(f"ont remote-ping {port} {ont} ip-address 8.8.8.8\r")
-            
+
             # Покидаем interface gpon
             send_command("quit")
 
