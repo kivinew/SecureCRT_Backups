@@ -1,17 +1,24 @@
 # $language = "Python3"
 # $interface = "1.0"
 
+# =====================================================================
 # TODO:
-
+# диагностика по серийнику display ont info by-sn
+# проверка версии ПО для моделей терминалов 254 и 245T
 # проверка массовости
 # при отсутствии линков на LAN портах, запись об ошибках LAN не нужна
 # пинг 8.8.8.8
 # mac-address ont
+# =====================================================================
+# для выполнения диагностики и помещения результата в буфер обмена 
+# необходимо выделить мышкой значение лицевого счёта или ONT
+# например, значение 102147 или 0/ 0/0 2
+# =====================================================================
 
 import pyperclip
 import re
 import traceback
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 
 crt.Screen.Synchronous = True
 
@@ -20,7 +27,6 @@ COMMANDS = {
     'info_by_serial': "display ont info by-sn {serial}",
     'ont_info': "display ont info {frame} {slot} {port} {ont}",
     'ont_version': "display ont version {frame} {slot} {port} {ont}",
-    'gpon_iface': "interface gpon {frame}/{slot}",
     'optical_info': "display ont optical-info {port} {ont}",
     'ont_line_quality': "{command} statistics ont-line-quality {port} {ont}",
     'eth_ports': "display ont port state {port} {ont} eth-port all",
@@ -37,8 +43,9 @@ PATTERNS = {
     'down_cause': r"Last down cause\s+:\s+(dying-gasp|LOS)",
     'distance': r" distance\(m\)\s*:\s*(\d+)",
     'distance_last': r"",
-    'ont_version': r"Main Software Version\s*:\s*(\S*)",
+    'soft_version': r"Main Software Version\s*:\s*(\S*)",
     'ont_model': r"OntProductDescription    : EchoLife (\S+) GPON",
+    'ont_model2': r"Equipment-ID\s*:\s*(\w+)",
     'ont_rx_power': r"Rx optical power\(dBm\)\s*:\s*([\d.-]+)",
     'olt_rx_power': r"OLT Rx ONT optical power\(dBm\)\s*:\s*([\d.-]+)",
     'lan_ports': r"(\d+)\s+(\d+)\s+(GE|FE)\s+(\d+|-)+\s+(full|half|-)\s+(up|down)",
@@ -89,7 +96,7 @@ def read_output() -> str:
         output += line
     return output
 
-def parse_output(output: str, pattern: str, transform=lambda x: x) -> Optional[str | int | float]:
+def parse_output(output: str, pattern: str, transform=lambda x: x) -> str:
     """Парсинг вывода с использованием регулярных выражений."""
     match = re.search(pattern, output)
     return transform(match.group(1)) if match else None
@@ -126,7 +133,7 @@ def main() -> None:
     try:
         mem_buffer = pyperclip.paste().strip()
         if not mem_buffer:
-            raise Exception("Буфер обмена пуст.")
+            crt.Screen.Send("display ont info by-desc ")
             return
 
         # Выход из interface gpon, если нужно
@@ -153,14 +160,15 @@ def main() -> None:
         for key in ['status', 'serial', 'uptime', 'downtime', 'down_cause']:
             parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
         
-        if parsed_data['down_cause'] == 'dying-gasp':
-            parsed_data['down_cause'] += ' – отключение электропитания. Необходима проверка терминала и БП.'
-        elif parsed_data['down_cause'] == 'LOS' or 'LOSi/LOBi':
-            parsed_data['down_cause'] += ' – отсутствует оптический сигнал. Необходима проверка оптической линии.'
-        elif parsed_data['down_cause'] == 'LOFi':
-            parsed_data['down_cause'] += ' – низкий/отсутствует уровень оптического сигнала. Необходима проверка оптической линии.'
-         
+        # Расшифровка причин недоступности терминала
         if parsed_data['status'] == 'offline':
+            if parsed_data['down_cause'] == 'dying-gasp':
+                parsed_data['down_cause'] += ' – отключение электропитания. Необходима проверка терминала и БП.'
+            elif parsed_data['down_cause'] == 'LOS' or 'LOSi/LOBi':
+                parsed_data['down_cause'] += ' – отсутствует оптический сигнал. Необходима проверка оптической линии.'
+            elif parsed_data['down_cause'] == 'LOFi':
+                parsed_data['down_cause'] += ' – низкий/отсутствует уровень оптического сигнала. Необходима проверка оптической линии.'
+             
             parsed_data['distance'] = parse_output(output_ont_info, PATTERNS['distance'], int) or parsed_data['distance']
             clipboard_data += (
                 f"PON SN = {parsed_data['serial']}\n"
@@ -171,12 +179,17 @@ def main() -> None:
                 )
         else:
             parsed_data['distance'] = parse_output(output_ont_info, PATTERNS['distance'], int) or parsed_data['distance']
-            
+        
+        # Парсинг модели терминала и версии ПО  
         if parsed_data['status'] == 'online':
             output_version = send_command(COMMANDS['ont_version'].format(frame=frame, slot=slot, port=port, ont=ont))
-            parsed_data['version'] = parse_output(output_version, PATTERNS['ont_version']) or parsed_data['version']
-            parsed_data['model'] = parse_output(output_version, PATTERNS['ont_model']) or parsed_data['model']
-
+            # Парсинг версии с первым шаблоном
+            soft_version = parse_output(output_version, PATTERNS['ont_model'])
+            if not soft_version:  # Если версия не найдена, пробуем второй шаблон
+                soft_version = parse_output(output_version, PATTERNS['ont_model2'])
+            parsed_data['model'] = soft_version or parsed_data['model']
+            parsed_data['version'] = parse_output(output_version, PATTERNS['soft_version']) or parsed_data['model']
+            
             # Формирование строки базовой информации
             clipboard_data += (
                 f"PON SN = {parsed_data['serial']}\n"
@@ -191,8 +204,8 @@ def main() -> None:
 
             # Оптическая информация
             output_optical_info = send_command(COMMANDS['optical_info'].format(port=port, ont=ont))
-            parsed_data['ont_rx_power'] = parse_output(output_optical_info, PATTERNS['ont_rx_power'], float) or parsed_data['ont_rx_power']
-            parsed_data['olt_rx_power'] = parse_output(output_optical_info, PATTERNS['olt_rx_power'], float) or parsed_data['olt_rx_power']
+            parsed_data['ont_rx_power'] = parse_output(output_optical_info, PATTERNS['ont_rx_power'], str) or parsed_data['ont_rx_power']
+            parsed_data['olt_rx_power'] = parse_output(output_optical_info, PATTERNS['olt_rx_power'], str) or parsed_data['olt_rx_power']
 
             clipboard_data += (
                 f"ONT Rx (оптический сигнал на терминале)(dBm): {parsed_data['ont_rx_power']}\n"
@@ -244,6 +257,9 @@ def main() -> None:
             
             clipboard_data += ethernet_counters + "Выполнен сброс счётчиков ошибок.\n" if has_eth_errors else "Ошибок портов LAN нет.\n"
             
+            # Пинг до 8.8.8.8
+            send_command(f"ont remote-ping {port} {ont} ip-address 8.8.8.8\r")
+            
             # Покидаем interface gpon
             send_command("quit")
 
@@ -252,7 +268,7 @@ def main() -> None:
 
     except Exception as e:
         error_line = traceback.extract_tb(e.__traceback__)[-1].lineno
-        msg = f"Ошибка в строке {error_line}: {e}"
+        msg = f"Ошибка в строке №{error_line}: {e}"
         crt.Dialog.MessageBox(msg)
 
 main()

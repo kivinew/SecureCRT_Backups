@@ -2,6 +2,7 @@
 # $interface = "1.0"
 
 import pyperclip
+import SU_challenge
 
 crt.Screen.Synchronous = True	
 

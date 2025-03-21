@@ -38,5 +38,4 @@ def main():
     # Отправляем команду на устройство
     crt.Screen.Send(command)
 
-
 main()

@@ -6,7 +6,6 @@ import hashlib
 
 crt.Screen.Synchronous = True   
 
-
 def main():
     def suPassword(chall):
         premd5 = bytearray(8)

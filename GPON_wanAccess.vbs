@@ -34,7 +34,7 @@ def main():
 	conf: str
 	# присвоить 1, если нужен WanAccess.xml
 	# приствоить 0, если нужен WanAccess_HG8245
-	access = 0
+	access = 1
 
 	conf = "WanAccess" if access == 1 else "WanAccess_HG8245"
 
