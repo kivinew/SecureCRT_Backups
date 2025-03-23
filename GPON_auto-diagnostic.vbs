@@ -74,7 +74,8 @@ parsed_data = {
     "upstream_errors": "0",
     "downstream_errors": "0",
     "lan_ports": [],
-    "eth_errors": {"fcs": 0, "received_bad_bytes": 0, "sent_bad_bytes": 0}
+    "eth_errors": {"fcs": 0, "received_bad_bytes": 0, "sent_bad_bytes": 0},
+    "troubleshooting": "Нарушений не выявлено."
 }
 
 def send_command(command: str) -> str:
@@ -110,7 +111,7 @@ def parse_by_description(output: str) -> tuple:
 
 def parse_by_serial(output: str) -> tuple:
     """Извлечение frame, slot, port и ont из вывода команды display ont info by-desc."""
-    match = re.search(PATTERNS['ont_by_serial'], output)
+    match = re.search(PATTERNS['ont_by_serial'], output, re.DOTALL)
     if match:
         return match.groups()
     raise ValueError("Не удалось найти данные ONT по серийному номеру!")
@@ -151,53 +152,54 @@ def main() -> None:
             crt.Screen.Send("quit\r")
 
         # Определение frame, slot, port, ont
-        if re.match(r'^(kes|fl|fl_)?\d{5,6}$', mem_buffer):  # если в буфере обмена дескрипшен
-            output = send_command(COMMANDS['info_by_description'].format(description=mem_buffer))
-            frame, slot, port, ont = parse_by_description(output)
-        elif re.match(r'^[A-Fa-f0-9]{16}$', mem_buffer):  # Если в буфере обмена серийный номер
+        if re.match(r'^[A-Fa-f0-9]{16}$', mem_buffer):  # Если в буфере обмена серийный номер
             output_ont_by_serial = send_command(COMMANDS['info_by_serial'].format(serial=mem_buffer))
-            for key in ['status', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
-                frame, slot, port, ont = parse_by_serial(output_ont_by_serial)
-                # parsed_data[key] = parse_output(output_ont_by_serial, PATTERNS[key]) or parsed_data[key]
-        else:   # если в буфере адрес ONT или неподходящие данные
-            ont_data = mem_buffer.replace('/', ' ').split()
-            if len(ont_data) != 4:
-                raise ValueError("Ошибка!\nСкопируй серийный номер, дескрипшен (5-6 цифр) или ONT")
-            frame, slot, port, ont = ont_data
+            frame, slot, port, ont = parse_by_serial(output_ont_by_serial)
+            for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
+                parsed_data[key] = parse_output(output_ont_by_serial, PATTERNS[key]) or parsed_data[key]
+        else:
+            if re.match(r'^(kes|fl|fl_)?\d{5,6}$', mem_buffer):  # если в буфере обмена дескрипшен
+                output = send_command(COMMANDS['info_by_description'].format(description=mem_buffer))
+                frame, slot, port, ont = parse_by_description(output)
+            
+            else:# если в буфере адрес ONT или неподходящие данные
+                ont_data = mem_buffer.replace('/', ' ').split()
+                if len(ont_data) != 4:
+                    raise ValueError("\nСкопируй серийный номер, дескрипшен (5-6 цифр) или ONT")
+                frame, slot, port, ont = ont_data
+            # Сбор базовой информации
+            output_ont_info = send_command(COMMANDS['ont_info'].format(frame=frame, slot=slot, port=port, ont=ont))
+            for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
+                parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
 
         # Инициализация буфера обмена
-        clipboard_data = f"ONT = {frame}/{slot}/{port} {ont}\n"
-
-        # Сбор базовой информации
-        output_ont_info = send_command(COMMANDS['ont_info'].format(frame=frame, slot=slot, port=port, ont=ont))
-        for key in ['status', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
-            parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
-
+        clipboard_data = ''
         clipboard_data += (
+            f"ONT = {frame}/{slot}/{port} {ont}\n"
             f"Description = {parsed_data['description']}\n"
             f"PON SN = {parsed_data['serial']}\n"
+            f"Терминал доступен.\n" if parsed_data['status'] == 'online' else "Терминал недоступен.\n"
         )
         
         # Расшифровка причин недоступности терминала
         if parsed_data['status'] == 'offline':
             if 'нет данных' in parsed_data['down_cause']:
-                parsed_data['down_cause'] = 'информация на головной станции не сохранилась.'
+                parsed_data['down_cause'] = "информация на головной станции не сохранилась."
+                parsed_data['troubleshooting'] = "Интернет не работает."
             elif 'dying-gasp' in parsed_data['down_cause']:
-                parsed_data['down_cause'] += ' – отключение электропитания. Необходима проверка терминала и БП.'
+                parsed_data['troubleshooting'] = "Интернет не работает. Последняя запись в логах о выключении питания терминала. Необходима проверка терминала и БП."
             elif 'LOS' or 'LOSi/LOBi' in parsed_data['down_cause']:
-                parsed_data['down_cause'] += ' – отсутствует оптический сигнал. Необходима проверка оптической линии.'
+                parsed_data['troubleshooting'] = "Интернет не работает. Отсутствует оптический сигнал. Необходима проверка оптической линии."
             elif 'LOFi' in parsed_data['down_cause']:
-                parsed_data['down_cause'] += ' – низкий/отсутствует уровень оптического сигнала. Необходима проверка оптической линии.'
+                parsed_data['troubleshooting'] = "Обнаружен низкий уровень оптического сигнала. Необходима проверка оптической линии."
              
-            parsed_data['distance'] = parse_output(output_ont_info, PATTERNS['distance'], int) or parsed_data['distance']
             clipboard_data += (
                 f"Растояние от головной станции (м): {parsed_data['distance']}\n"
                 f"Время последнего включения: {parsed_data['uptime']}\n"
                 f"Время отключения: {parsed_data['downtime']}\n"
-                f"Причина отключения — {parsed_data['down_cause']}"
+                f"Причина недоступности — {parsed_data['down_cause']}\n"
+                f"\n{parsed_data['troubleshooting']}"   #   Рекомендация по результатам диагностики
                 )
-        else:
-            parsed_data['distance'] = parse_output(output_ont_info, PATTERNS['distance'], int) or parsed_data['distance']
         
         # Парсинг модели терминала и версии ПО  
         if parsed_data['status'] == 'online':
@@ -229,6 +231,11 @@ def main() -> None:
                 f"ONT Rx (оптический сигнал на терминале)(dBm): {parsed_data['ont_rx_power']}\n"
                 f"OLT Rx (сигнал на головной станции)(dBm): {parsed_data['olt_rx_power']}\n"
             )
+
+            if float(parsed_data['ont_rx_power']) < -26.5 or float(parsed_data['olt_rx_power']) < -31.5 :
+                parsed_data['troubleshooting'] = "Обнаружен низкий уровень оптического сигнала. Необходима проверка оптической линии."
+            else:
+                parsed_data['troubleshooting'] = "Нарушений не выявлено."
 
             # Ошибки оптики
             output_optical_errors = send_command(COMMANDS['ont_line_quality'].format(command='display', port=port, ont=ont))
@@ -281,6 +288,9 @@ def main() -> None:
             
             # Покидаем interface gpon
             send_command("quit")
+            
+            # Рекомендация по результатам диагностики
+            clipboard_data += f"\n{parsed_data['troubleshooting']}"  
 
         # Копирование в буфер
         pyperclip.copy(clipboard_data)

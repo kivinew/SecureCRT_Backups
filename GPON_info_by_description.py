@@ -11,7 +11,7 @@ def main():
     memBuffer = pyperclip.paste()
     
     # Проверяем, что содержимое соответствует шаблону для номера лицевого счета (пяти- или шестизначное число)
-    if re.match(r'^\d{5,6}$', memBuffer):
+    if re.match(r'^(fl_|kes)?\d{5,6}$', memBuffer):
         crt.Screen.Send(f"display ont info by-desc {memBuffer}\r")
     else:
         # Если номер в памяти не найден, вводим команду без параметра
