@@ -4,10 +4,9 @@
 # =====================================================================
 # TODO:
 # диагностика по серийнику display ont info by-sn
-# проверка версии ПО для моделей терминалов 254 и 245T
+# проверка версии ПО для моделей терминалов 245 и 245T
 # проверка массовости
-# при отсутствии линков на LAN портах, запись об ошибках LAN не нужна
-# пинг 8.8.8.8
+# при отсутствии линков на LAN портах, запись об ошибках LAN не нужна, но нужно сбросить ошибки
 # mac-address ont
 # =====================================================================
 # для выполнения диагностики и помещения результата в буфер обмена 
@@ -18,14 +17,14 @@
 import pyperclip
 import re
 import traceback
-from typing import Dict, List, Tuple
 
 crt.Screen.Synchronous = True
 
 # Строковые константы
 COMMANDS = {
-    'info_by_serial': "display ont info by-sn {serial}",
     'ont_info': "display ont info {frame} {slot} {port} {ont}",
+    'info_by_serial': "display ont info by-sn {serial}",
+    'info_by_description': "display ont info by-desc {description}",
     'ont_version': "display ont version {frame} {slot} {port} {ont}",
     'optical_info': "display ont optical-info {port} {ont}",
     'ont_line_quality': "{command} statistics ont-line-quality {port} {ont}",
@@ -35,14 +34,15 @@ COMMANDS = {
 
 # Регулярные выражения для извлечения данных
 PATTERNS = {
-    'ont_info': r"(\d+)/\s*(\d+)/\s*(\d+)\s+(\d+)",
+    'ont_by_serial': r"F\/S\/P\s*:\s(\d+)\/(\d+)\/(\d+).*ONT-ID\s*:\s(\d+)",
+    'ont_by_desc': r"(\d+)/\s*(\d+)/\s*(\d+)\s+(\d+)",
     'status': r"Run state\s+:\s+(\S+)",
     'serial': r"SN\s*:\s*([\w-]+)\s*\(",
+    'description': r"Description\s+:\s((fl_|kes|)?\d{5,6})|(ONT_NO_DESCRIPTION)",
     'uptime': r"Last up time\s*:\s*([\d-]+\s[\d:+-]+)",
     'downtime': r"Last down time\s*:\s*([\d-]+\s[\d:+-]+)",
     'down_cause': r"Last down cause\s+:\s+(dying-gasp|LOS)",
     'distance': r" distance\(m\)\s*:\s*(\d+)",
-    'distance_last': r"",
     'soft_version': r"Main Software Version\s*:\s*(\S*)",
     'ont_model': r"OntProductDescription    : EchoLife (\S+) GPON",
     'ont_model2': r"Equipment-ID\s*:\s*(\w+)",
@@ -58,11 +58,11 @@ PATTERNS = {
     }
 }
 
-# Инициализация данных с типизацией
-ParsedData = Dict[str, str | int | float | List[dict]]
-parsed_data: ParsedData = {
+# Инициализация данных
+parsed_data = {
     "status": "offline",
     "serial": "нет данных",
+    "description": "нет данных",
     "model": "нет данных",
     "version": "нет данных",
     "distance": "нет данных",
@@ -87,7 +87,7 @@ def send_command(command: str) -> str:
     return read_output()
 
 def read_output() -> str:
-    """Чтение вывода терминала построчно с таймаутом."""
+    """Чтение вывода в терминал построчно с таймаутом."""
     output = ""
     while True:
         line = crt.Screen.ReadString("\n", 1)  # Таймаут 1 секунда
@@ -101,14 +101,21 @@ def parse_output(output: str, pattern: str, transform=lambda x: x) -> str:
     match = re.search(pattern, output)
     return transform(match.group(1)) if match else None
 
-def parse_by_desc(output: str) -> Tuple[str, str, str, str]:
+def parse_by_description(output: str) -> tuple:
     """Извлечение frame, slot, port и ont из вывода команды display ont info by-desc."""
-    match = re.search(PATTERNS['ont_info'], output)
+    match = re.search(PATTERNS['ont_by_desc'], output)
     if match:
         return match.groups()
     raise ValueError("Не удалось найти данные ONT по дескрипшену!")
 
-def parse_lan_ports(output: str) -> List[Dict[str, str]]:
+def parse_by_serial(output: str) -> tuple:
+    """Извлечение frame, slot, port и ont из вывода команды display ont info by-desc."""
+    match = re.search(PATTERNS['ont_by_serial'], output)
+    if match:
+        return match.groups()
+    raise ValueError("Не удалось найти данные ONT по серийному номеру!")
+
+def parse_lan_ports(output: str) -> list:
     """Парсинг состояния LAN портов."""
     return [
         {
@@ -121,7 +128,7 @@ def parse_lan_ports(output: str) -> List[Dict[str, str]]:
         for match in re.finditer(PATTERNS['lan_ports'], output)
     ]
 
-def parse_eth_errors(output: str) -> Dict[str, int]:
+def parse_eth_errors(output: str) -> dict:
     """Парсинг ошибок Ethernet."""
     return {
         key: parse_output(output, pattern, int) or 0
@@ -132,6 +139,7 @@ def main() -> None:
     """Основная логика скрипта."""
     try:
         mem_buffer = pyperclip.paste().strip()
+        # Если в буфере нет содержимого, то просто выводим команду "display ont info by-desc "
         if not mem_buffer:
             crt.Screen.Send("display ont info by-desc ")
             return
@@ -143,13 +151,18 @@ def main() -> None:
             crt.Screen.Send("quit\r")
 
         # Определение frame, slot, port, ont
-        if re.match(r'^\d+$', mem_buffer):
-            output = send_command(f"display ont info by-desc {mem_buffer}")
-            frame, slot, port, ont = parse_by_desc(output)
-        else:
+        if re.match(r'^(kes|fl|fl_)?\d{5,6}$', mem_buffer):  # если в буфере обмена дескрипшен
+            output = send_command(COMMANDS['info_by_description'].format(description=mem_buffer))
+            frame, slot, port, ont = parse_by_description(output)
+        elif re.match(r'^[A-Fa-f0-9]{16}$', mem_buffer):  # Если в буфере обмена серийный номер
+            output_ont_by_serial = send_command(COMMANDS['info_by_serial'].format(serial=mem_buffer))
+            for key in ['status', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
+                frame, slot, port, ont = parse_by_serial(output_ont_by_serial)
+                # parsed_data[key] = parse_output(output_ont_by_serial, PATTERNS[key]) or parsed_data[key]
+        else:   # если в буфере адрес ONT или неподходящие данные
             ont_data = mem_buffer.replace('/', ' ').split()
             if len(ont_data) != 4:
-                raise ValueError("Некорректный формат адреса ONT.")
+                raise ValueError("Ошибка!\nСкопируй серийный номер, дескрипшен (5-6 цифр) или ONT")
             frame, slot, port, ont = ont_data
 
         # Инициализация буфера обмена
@@ -157,21 +170,27 @@ def main() -> None:
 
         # Сбор базовой информации
         output_ont_info = send_command(COMMANDS['ont_info'].format(frame=frame, slot=slot, port=port, ont=ont))
-        for key in ['status', 'serial', 'uptime', 'downtime', 'down_cause']:
+        for key in ['status', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
             parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
+
+        clipboard_data += (
+            f"Description = {parsed_data['description']}\n"
+            f"PON SN = {parsed_data['serial']}\n"
+        )
         
         # Расшифровка причин недоступности терминала
         if parsed_data['status'] == 'offline':
-            if parsed_data['down_cause'] == 'dying-gasp':
+            if 'нет данных' in parsed_data['down_cause']:
+                parsed_data['down_cause'] = 'информация на головной станции не сохранилась.'
+            elif 'dying-gasp' in parsed_data['down_cause']:
                 parsed_data['down_cause'] += ' – отключение электропитания. Необходима проверка терминала и БП.'
-            elif parsed_data['down_cause'] == 'LOS' or 'LOSi/LOBi':
+            elif 'LOS' or 'LOSi/LOBi' in parsed_data['down_cause']:
                 parsed_data['down_cause'] += ' – отсутствует оптический сигнал. Необходима проверка оптической линии.'
-            elif parsed_data['down_cause'] == 'LOFi':
+            elif 'LOFi' in parsed_data['down_cause']:
                 parsed_data['down_cause'] += ' – низкий/отсутствует уровень оптического сигнала. Необходима проверка оптической линии.'
              
             parsed_data['distance'] = parse_output(output_ont_info, PATTERNS['distance'], int) or parsed_data['distance']
             clipboard_data += (
-                f"PON SN = {parsed_data['serial']}\n"
                 f"Растояние от головной станции (м): {parsed_data['distance']}\n"
                 f"Время последнего включения: {parsed_data['uptime']}\n"
                 f"Время отключения: {parsed_data['downtime']}\n"
@@ -192,7 +211,6 @@ def main() -> None:
             
             # Формирование строки базовой информации
             clipboard_data += (
-                f"PON SN = {parsed_data['serial']}\n"
                 f"Модель терминала: '{parsed_data['model']}'\n"
                 f"Версия ПО терминала: '{parsed_data['version']}'\n"
                 f"Растояние от головной станции (м): {parsed_data['distance']}\n"
@@ -258,7 +276,8 @@ def main() -> None:
             clipboard_data += ethernet_counters + "Выполнен сброс счётчиков ошибок.\n" if has_eth_errors else "Ошибок портов LAN нет.\n"
             
             # Пинг до 8.8.8.8
-            send_command(f"ont remote-ping {port} {ont} ip-address 8.8.8.8\r")
+            if '310' not in parsed_data['model']:
+                send_command(f"ont remote-ping {port} {ont} ip-address 8.8.8.8\r")
             
             # Покидаем interface gpon
             send_command("quit")
