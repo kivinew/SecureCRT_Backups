@@ -34,27 +34,27 @@ COMMANDS = {
 
 # Регулярные выражения для извлечения данных
 PATTERNS = {
-    'ont_by_serial': r"F\/S\/P\s*:\s(\d+)\/(\d+)\/(\d+).*ONT-ID\s*:\s(\d+)",
-    'ont_by_desc': r"(\d+)/\s*(\d+)/\s*(\d+)\s+(\d+)",
-    'status': r"Run state\s+:\s+(\S+)",
-    'serial': r"SN\s*:\s*([\w-]+)\s*\(",
-    'description': r"Description\s+:\s((fl_|kes|)?\d{5,6})|(ONT_NO_DESCRIPTION)",
-    'uptime': r"Last up time\s*:\s*([\d-]+\s[\d:+-]+)",
-    'downtime': r"Last down time\s*:\s*([\d-]+\s[\d:+-]+)",
-    'down_cause': r"Last down cause\s+:\s+(dying-gasp|LOS)",
-    'distance': r" distance\(m\)\s*:\s*(\d+)",
-    'soft_version': r"Main Software Version\s*:\s*(\S*)",
-    'ont_model': r"OntProductDescription    : EchoLife (\S+) GPON",
-    'ont_model2': r"Equipment-ID\s*:\s*(\w+)",
-    'ont_rx_power': r"Rx optical power\(dBm\)\s*:\s*([\d.-]+)",
-    'olt_rx_power': r"OLT Rx ONT optical power\(dBm\)\s*:\s*([\d.-]+)",
-    'lan_ports': r"(\d+)\s+(\d+)\s+(GE|FE)\s+(\d+|-)+\s+(full|half|-)\s+(up|down)",
-    'upstream_errors': r"Upstream frame BIP error count\s*:\s*(\d+)",
-    'downstream_errors': r"Downstream frame BIP error count\s*:\s*(\d+)",
-    'eth_errors': {
-        'fcs': r"Received FCS error frames\s+:\s+(\d+)",
-        'received_bad_bytes': r"Received bad bytes\s+:\s+(\d+)",
-        'sent_bad_bytes': r"Sent bad bytes\s+:\s+(\d+)"
+    "ont_by_serial": r"F\/S\/P\s*:\s(\d+)\/(\d+)\/(\d+).*ONT-ID\s*:\s(\d+)",
+    "ont_by_desc": r"(\d+)/\s*(\d+)/\s*(\d+)\s+(\d+)",
+    "status": r"Run state\s+:\s+(\S+)",
+    "serial": r"SN\s*:\s*([\w-]+)\s*\(",
+    "description": r"Description\s+:\s((fl_|kes|)?\d{5,6})|(ONT_NO_DESCRIPTION)",
+    "uptime": r"Last up time\s*:\s*([\d-]+\s[\d:+-]+)",
+    "downtime": r"Last down time\s*:\s*([\d-]+\s[\d:+-]+)",
+    "down_cause": r"Last down cause\s+:\s+(dying-gasp|LOS)",
+    "distance": r" distance\(m\)\s*:\s*(\d+)",
+    "soft_version": r"Main Software Version\s*:\s*(\S*)",
+    "ont_model": r"OntProductDescription    : EchoLife (\S+) GPON",
+    "ont_model2": r"Equipment-ID\s*:\s*(\w+)",
+    "ont_rx_power": r"Rx optical power\(dBm\)\s*:\s*([\d.-]+)",
+    "olt_rx_power": r"OLT Rx ONT optical power\(dBm\)\s*:\s*([\d.-]+)",
+    "lan_ports": r"(\d+)\s+(\d+)\s+(GE|FE)\s+(\d+|-)+\s+(full|half|-)\s+(up|down)",
+    "upstream_errors": r"Upstream frame BIP error count\s*:\s*(\d+)",
+    "downstream_errors": r"Downstream frame BIP error count\s*:\s*(\d+)",
+    "eth_errors": {
+        "fcs": r"Received FCS error frames\s+:\s+(\d+)",
+        "received_bad_bytes": r"Received bad bytes\s+:\s+(\d+)",
+        "sent_bad_bytes": r"Sent bad bytes\s+:\s+(\d+)"
     }
 }
 
