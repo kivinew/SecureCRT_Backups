@@ -60,15 +60,11 @@ def main():
 
 	memBuffer = pyperclip.paste()
 	ONT = memBuffer.replace('/', ' ').split()
-
 	frame: str    = ONT[0]
 	slot: str     = ONT[1]
 	port: str     = ONT[2]
 	ont_id: str   = ONT[3]
-    
-
 	terminal = Ont(frame, slot, port, ont_id)
-    
 	crt.Screen.Send(f'{ontInfo} {frame} {slot} {port} {ont_id}\rq')
 	terminal.getCurrentConfig()
 
