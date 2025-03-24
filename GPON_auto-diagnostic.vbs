@@ -37,8 +37,8 @@ PATTERNS = {
     "ont_by_serial": r"F\/S\/P\s*:\s(\d+)\/(\d+)\/(\d+).*ONT-ID\s*:\s(\d+)",
     "ont_by_desc": r"(\d+)/\s*(\d+)/\s*(\d+)\s+(\d+)",
     "status": r"Run state\s+:\s+(\S+)",
-    "serial": r"SN\s*:\s*([\w-]+)\s*\(",
-    "description": r"Description\s+:\s((fl_|kes|)?\d{5,6})|(ONT_NO_DESCRIPTION)",
+    "serial": r"SN\s*:\s*([\w-]+)",
+    "description": r"Description\s+:\s(\S+)",
     "uptime": r"Last up time\s*:\s*([\d-]+\s[\d:+-]+)",
     "downtime": r"Last down time\s*:\s*([\d-]+\s[\d:+-]+)",
     "down_cause": r"Last down cause\s+:\s+(dying-gasp|LOS)",
@@ -157,11 +157,10 @@ def main() -> None:
             frame, slot, port, ont = parse_by_serial(output_ont_by_serial)
             for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
                 parsed_data[key] = parse_output(output_ont_by_serial, PATTERNS[key]) or parsed_data[key]
-        else:
-            if re.match(r'^(kes|fl|fl_)?\d{5,6}$', mem_buffer):  # если в буфере обмена дескрипшен
+        else:   # если в буфере обмена дескрипшен
+            if re.match(r'^(kes|fl|fl_)?\d{5,6}$', mem_buffer): 
                 output = send_command(COMMANDS['info_by_description'].format(description=mem_buffer))
                 frame, slot, port, ont = parse_by_description(output)
-            
             else:# если в буфере адрес ONT или неподходящие данные
                 ont_data = mem_buffer.replace('/', ' ').split()
                 if len(ont_data) != 4:
