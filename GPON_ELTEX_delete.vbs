@@ -4,7 +4,7 @@ import re
 import pyperclip
 import time
 
-crt.Screen.Synchronous = True
+crt.Screen.Synchronous = False
 
 def get_ont_interface(output):
     match = re.search(r'interface ont (\d+/\d+)', output)

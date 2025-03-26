@@ -23,17 +23,14 @@ def is_interface_name(text):
 def main():
     # Получаем содержимое буфера обмена
     memBuffer = pyperclip.paste().strip()  # Убираем лишние пробелы
-    
-    if not memBuffer:
-        crt.Dialog.MessageBox("Буфер обмена пуст.", "Ошибка", 16)
-        return
+
     # Определяем команду в зависимости от содержимого буфера
     if is_mac_address(memBuffer):
         command = f"show mac address-table address {memBuffer}\r"
     elif is_interface_name(memBuffer):
         command = f"show mac address-table interface {memBuffer}\r"
     else:
-        command = "show mac address-table"
+        command = "show mac address-table "
 
     # Отправляем команду на устройство
     crt.Screen.Send(command)
