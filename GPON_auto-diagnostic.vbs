@@ -18,7 +18,7 @@
 import pyperclip
 import re
 import traceback
-crt.Screen.Synchronous = False
+crt.Screen.Synchronous = True
 
 # Строковые константы
 COMMANDS = {
@@ -37,7 +37,7 @@ PATTERNS = {
     "ont_by_serial": r"F\/S\/P\s*:\s(\d+)\/(\d+)\/(\d+).*ONT-ID\s*:\s(\d+)",
     "ont_by_desc": r"(\d+)/\s*(\d+)/\s*(\d+)\s+(\d+)",
     "status": r"Run state\s+:\s+(\S+)",
-    "serial": r"SN\s*:\s*([\w-]+)",
+    "serial": r"SN\s+:\s+(48575443[A-Fa-f0-9]{8})",
     "description": r"Description\s+:\s(\S+)",
     "uptime": r"Last up time\s*:\s*([\d-]+\s[\d:+-]+)",
     "downtime": r"Last down time\s*:\s*([\d-]+\s[\d:+-]+)",
@@ -111,7 +111,7 @@ def parse_by_description(output: str) -> tuple:
 
 def parse_by_serial(output: str) -> tuple:
     """Извлечение frame, slot, port и ont из вывода команды display ont info by-desc."""
-    match = re.search(PATTERNS['ont_by_serial'], output, re.DOTALL)
+    match = re.search(PATTERNS['ont_by_serial'], output)
     if match:
         return match.groups()
     raise ValueError("Не удалось найти данные ONT по серийному номеру!")
@@ -152,7 +152,7 @@ def main() -> None:
             crt.Screen.Send("quit\r")
 
         # Определение frame, slot, port, ont
-        if re.match(r'^[A-Fa-f0-9]{16}$', mem_buffer):  # Если в буфере обмена серийный номер
+        if re.match(r'48575443[A-Fa-f0-9]{8}', mem_buffer):  # Если в буфере обмена серийный номер
             output_ont_by_serial = send_command(COMMANDS['info_by_serial'].format(serial=mem_buffer))
             frame, slot, port, ont = parse_by_serial(output_ont_by_serial)
             for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
