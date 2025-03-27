@@ -18,6 +18,8 @@
 import pyperclip
 import re
 import traceback
+import time
+
 crt.Screen.Synchronous = True
 
 # Строковые константы
@@ -77,14 +79,15 @@ parsed_data = {
     "eth_errors": {"fcs": 0, "received_bad_bytes": 0, "sent_bad_bytes": 0},
     "troubleshooting": "Нарушений не выявлено."
 }
-
 def send_command(command: str) -> str:
-    """Выполнение команды и возврат её вывода."""
+    """Выполнение команды и возврат её вывода с оптимизированными задержками и обработкой."""
     crt.Screen.Send(command + "\r")
     if "display ont info" in command and "by-desc" not in command:
         crt.Screen.Send("q")  # Выход из постраничного вывода
+        time.sleep(0.1)  # Уменьшенная задержка для обычных запросов
     elif "optical-info" in command or "ont-eth" in command:
         crt.Screen.Send(" ")  # Полный вывод
+        time.sleep(0.6)   #  Увеличенная задержка для optical-info
     return read_output()
 
 def read_output() -> str:
@@ -152,32 +155,38 @@ def main() -> None:
             crt.Screen.Send("quit\r")
 
         # Определение frame, slot, port, ont
-        if re.match(r'48575443[A-Fa-f0-9]{8}', mem_buffer):  # Если в буфере обмена серийный номер
-            output_ont_by_serial = send_command(COMMANDS['info_by_serial'].format(serial=mem_buffer))
-            frame, slot, port, ont = parse_by_serial(output_ont_by_serial)
+        if re.fullmatch(r'48575443[A-Fa-f0-9]{8}', mem_buffer):  # Проверка на серийный номер
+            output_ont_info = send_command(COMMANDS['info_by_serial'].format(serial=mem_buffer))
+            if output_ont_info is None:
+                crt.Dialog.MessageBox(str(output_ont_info))
+            frame, slot, port, ont = parse_by_serial(output_ont_info)
+            # Сбор базовой информации
             for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
-                parsed_data[key] = parse_output(output_ont_by_serial, PATTERNS[key]) or parsed_data[key]
-        else:   # если в буфере обмена дескрипшен
-            if re.match(r'^(kes|fl|fl_)?\d{5,6}$', mem_buffer): 
+                parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
+        else:
+            ont_data = mem_buffer.replace('/', ' ').split()
+            if len(ont_data) == 4:  # Если это адрес ONT (формат F/S/P ONT)
+                frame, slot, port, ont = ont_data
+            elif len(mem_buffer) > 4:  # Во всех остальных случаях считаем это дескрипшеном
                 output = send_command(COMMANDS['info_by_description'].format(description=mem_buffer))
                 frame, slot, port, ont = parse_by_description(output)
-            else:# если в буфере адрес ONT или неподходящие данные
-                ont_data = mem_buffer.replace('/', ' ').split()
-                if len(ont_data) != 4:
-                    raise ValueError("\nСкопируй серийный номер, дескрипшен (5-6 цифр) или ONT")
-                frame, slot, port, ont = ont_data
+            else:
+                raise ValueError("Несоответствующее запросу содержимое буфера обмена!\n"
+                                 "Необходимо скопировать серийный номер, "
+                                 "дескрипшен или ONT (пример: 0/1/1 10)")
+
             # Сбор базовой информации
             output_ont_info = send_command(COMMANDS['ont_info'].format(frame=frame, slot=slot, port=port, ont=ont))
             for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
                 parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
-
-        # Инициализация буфера обмена
-        clipboard_data = ''
-        clipboard_data += (
+        # crt.Dialog.MessageBox(str(output_ont_info))
+        # crt.Dialog.MessageBox(parsed_data['status'])
+        # Инициализация строки базовой информации
+        clipboard_data = (
             f"ONT = {frame}/{slot}/{port} {ont}\n"
             f"Description = {parsed_data['description']}\n"
             f"PON SN = {parsed_data['serial']}\n"
-            f"Терминал доступен.\n" if parsed_data['status'] == 'online' else "Терминал недоступен.\n"
+            f"Терминал {'доступен' if parsed_data['status'] == 'online' else 'недоступен'}.\n"
         )
         
         # Расшифровка причин недоступности терминала
@@ -193,9 +202,9 @@ def main() -> None:
                 parsed_data['troubleshooting'] = "Обнаружен низкий уровень оптического сигнала. Необходима проверка оптической линии."
              
             clipboard_data += (
-                f"Растояние от головной станции (м): {parsed_data['distance']}\n"
+                f"Отключён: {parsed_data['downtime']}\n"
                 f"Время последнего включения: {parsed_data['uptime']}\n"
-                f"Время отключения: {parsed_data['downtime']}\n"
+                f"Растояние от головной станции (м): {parsed_data['distance']}\n"
                 f"Причина недоступности — {parsed_data['down_cause']}\n"
                 f"\n{parsed_data['troubleshooting']}"   #   Рекомендация по результатам диагностики
                 )
@@ -212,10 +221,10 @@ def main() -> None:
             
             # Формирование строки базовой информации
             clipboard_data += (
+                f"Включён: {parsed_data['uptime']}\n"
                 f"Модель терминала: '{parsed_data['model']}'\n"
                 f"Версия ПО терминала: '{parsed_data['version']}'\n"
                 f"Растояние от головной станции (м): {parsed_data['distance']}\n"
-                f"Время последнего включения: {parsed_data['uptime']}\n"
                 )
             
             # Переход в interface gpon
@@ -300,7 +309,7 @@ def main() -> None:
 
     except Exception as e:
         error_line = traceback.extract_tb(e.__traceback__)[-1].lineno
-        msg = f"Ошибка в строке №{error_line}: {e}"
+        msg = f"Ошибка в строке № {error_line}:\n{e}"
         crt.Dialog.MessageBox(msg)
 
 main()
