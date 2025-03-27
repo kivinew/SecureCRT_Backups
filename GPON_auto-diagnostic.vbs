@@ -166,12 +166,15 @@ def main() -> None:
             if len(ont_data) == 4:  # Если это адрес ONT (формат F/S/P ONT)
                 frame, slot, port, ont = ont_data
             elif 4 < len(mem_buffer) <= 16:  # Во всех остальных случаях считаем это дескрипшеном
+            elif 4 < len(mem_buffer) <= 16:  # Во всех остальных случаях считаем это дескрипшеном
                 output = send_command(COMMANDS['info_by_description'].format(description=mem_buffer))
                 frame, slot, port, ont = parse_by_description(output)
             else:
                 raise ValueError("Несоответствующее запросу содержимое буфера обмена!\n"
                                  f"(длина {len(mem_buffer)})\n"
+                                 f"(длина {len(mem_buffer)})\n"
                                  "Необходимо скопировать серийный номер, "
+                                 "номер лицевого счёта или ONT (пример: 0/1/1 10)")
                                  "номер лицевого счёта или ONT (пример: 0/1/1 10)")
 
             # Сбор базовой информации
