@@ -39,7 +39,7 @@ PATTERNS = {
     "ont_by_serial": r"F\/S\/P\s*:\s(\d+)\/(\d+)\/(\d+).*ONT-ID\s*:\s(\d+)",
     "ont_by_desc": r"(\d+)/\s*(\d+)/\s*(\d+)\s+(\d+)",
     "status": r"Run state\s+:\s+(\S+)",
-    "serial": r"SN\s+:\s+(48575443[A-Fa-f0-9]{8})",
+    "serial": r"SN\s+:\s+([A-Fa-f0-9]{16})",
     "description": r"Description\s+:\s(\S+)",
     "uptime": r"Last up time\s*:\s*([\d-]+\s[\d:+-]+)",
     "downtime": r"Last down time\s*:\s*([\d-]+\s[\d:+-]+)",
@@ -155,10 +155,8 @@ def main() -> None:
             crt.Screen.Send("quit\r")
 
         # Определение frame, slot, port, ont
-        if re.fullmatch(r'48575443[A-Fa-f0-9]{8}', mem_buffer):  # Проверка на серийный номер
-            output_ont_info = send_command(COMMANDS['info_by_serial'].format(serial=mem_buffer))
-            if output_ont_info is None:
-                crt.Dialog.MessageBox(str(output_ont_info))
+        if re.fullmatch(r'(48575443|HWTC|hwtc)[A-Fa-f0-9]{8}', mem_buffer):  # Проверка на серийный номер
+            output_ont_info = send_command(COMMANDS['info_by_serial'].format(serial=mem_buffer.upper()))
             frame, slot, port, ont = parse_by_serial(output_ont_info)
             # Сбор базовой информации
             for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
@@ -167,13 +165,14 @@ def main() -> None:
             ont_data = mem_buffer.replace('/', ' ').split()
             if len(ont_data) == 4:  # Если это адрес ONT (формат F/S/P ONT)
                 frame, slot, port, ont = ont_data
-            elif len(mem_buffer) > 4:  # Во всех остальных случаях считаем это дескрипшеном
+            elif 4 < len(mem_buffer) <= 16:  # Во всех остальных случаях считаем это дескрипшеном
                 output = send_command(COMMANDS['info_by_description'].format(description=mem_buffer))
                 frame, slot, port, ont = parse_by_description(output)
             else:
                 raise ValueError("Несоответствующее запросу содержимое буфера обмена!\n"
+                                 f"(длина {len(mem_buffer)})\n"
                                  "Необходимо скопировать серийный номер, "
-                                 "дескрипшен или ONT (пример: 0/1/1 10)")
+                                 "номер лицевого счёта или ONT (пример: 0/1/1 10)")
 
             # Сбор базовой информации
             output_ont_info = send_command(COMMANDS['ont_info'].format(frame=frame, slot=slot, port=port, ont=ont))
