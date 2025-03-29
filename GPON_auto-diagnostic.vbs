@@ -7,11 +7,8 @@
 # или ONT, например, значение "485754430068409E", "102147" или "0/ 0/0 2"
 # =====================================================================
 # TODO:
-# диагностика по серийнику display ont info by-sn
-# замена "HWTC" на "48575443" в серийном номере
 # проверка версии ПО для моделей терминалов 245 и 245T
 # проверка массовости
-# при отсутствии линков на LAN портах, запись об ошибках LAN не нужна, но нужно сбросить ошибки
 # mac-address ont
 # =====================================================================
 
@@ -82,9 +79,10 @@ parsed_data = {
 def send_command(command: str) -> str:
     """Выполнение команды и возврат её вывода с оптимизированными задержками и обработкой."""
     crt.Screen.Send(command + "\r")
+    time.sleep(0.2)
     if "display ont info" in command and "by-desc" not in command:
         crt.Screen.Send("q")  # Выход из постраничного вывода
-        time.sleep(0.2)  # Уменьшенная задержка для обычных запросов
+        time.sleep(0.3)  # Уменьшенная задержка для обычных запросов
     elif "optical-info" in command or "ont-eth" in command:
         crt.Screen.Send(" ")  # Полный вывод
         time.sleep(0.7)   #  Увеличенная задержка для optical-info
@@ -166,15 +164,12 @@ def main() -> None:
             if len(ont_data) == 4:  # Если это адрес ONT (формат F/S/P ONT)
                 frame, slot, port, ont = ont_data
             elif 4 < len(mem_buffer) <= 16:  # Во всех остальных случаях считаем это дескрипшеном
-            elif 4 < len(mem_buffer) <= 16:  # Во всех остальных случаях считаем это дескрипшеном
                 output = send_command(COMMANDS['info_by_description'].format(description=mem_buffer))
                 frame, slot, port, ont = parse_by_description(output)
             else:
                 raise ValueError("Несоответствующее запросу содержимое буфера обмена!\n"
                                  f"(длина {len(mem_buffer)})\n"
-                                 f"(длина {len(mem_buffer)})\n"
                                  "Необходимо скопировать серийный номер, "
-                                 "номер лицевого счёта или ONT (пример: 0/1/1 10)")
                                  "номер лицевого счёта или ONT (пример: 0/1/1 10)")
 
             # Сбор базовой информации
