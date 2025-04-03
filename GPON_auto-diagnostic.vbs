@@ -40,7 +40,7 @@ PATTERNS = {
     "description": r"Description\s+:\s(\S+)",
     "uptime": r"Last up time\s*:\s*([\d-]+\s[\d:+-]+)",
     "downtime": r"Last down time\s*:\s*([\d-]+\s[\d:+-]+)",
-    "down_cause": r"Last down cause\s+:\s+(dying-gasp|LOS)",
+    "down_cause": r"Last down cause\s+:\s+(\S+)",
     "distance": r" distance\(m\)\s*:\s*(\d+)",
     "soft_version": r"Main Software Version\s*:\s*(\S*)",
     "ont_model": r"OntProductDescription    : EchoLife (\S+) GPON",
@@ -176,8 +176,7 @@ def main() -> None:
             output_ont_info = send_command(COMMANDS['ont_info'].format(frame=frame, slot=slot, port=port, ont=ont))
             for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
                 parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
-        # crt.Dialog.MessageBox(str(output_ont_info))
-        # crt.Dialog.MessageBox(parsed_data['status'])
+
         # Инициализация строки базовой информации
         clipboard_data = (
             f"ONT = {frame}/{slot}/{port} {ont}\n"
@@ -191,12 +190,12 @@ def main() -> None:
             if 'нет данных' in parsed_data['down_cause']:
                 parsed_data['down_cause'] = "информация на головной станции не сохранилась."
                 parsed_data['troubleshooting'] = "Интернет не работает."
-            elif 'dying-gasp' in parsed_data['down_cause']:
-                parsed_data['troubleshooting'] = "Интернет не работает. Последняя запись в логах о выключении питания терминала. Необходима проверка терминала и БП."
-            elif 'LOS' or 'LOSi/LOBi' in parsed_data['down_cause']:
-                parsed_data['troubleshooting'] = "Интернет не работает. Отсутствует оптический сигнал. Необходима проверка оптической линии."
             elif 'LOFi' in parsed_data['down_cause']:
                 parsed_data['troubleshooting'] = "Обнаружен низкий уровень оптического сигнала. Необходима проверка оптической линии."
+            elif 'LOS' or 'LOSi/LOBi' in parsed_data['down_cause']:
+                parsed_data['troubleshooting'] = "Интернет не работает. Отсутствует оптический сигнал. Необходима проверка оптической линии."
+            elif 'dying-gasp' in parsed_data['down_cause']:
+                parsed_data['troubleshooting'] = "Интернет не работает. Последняя запись в логах о выключении питания терминала. Необходима проверка терминала и БП."
              
             clipboard_data += (
                 f"Отключён: {parsed_data['downtime']}\n"
@@ -237,10 +236,14 @@ def main() -> None:
                 f"OLT Rx (сигнал на головной станции)(dBm): {parsed_data['olt_rx_power']}\n"
             )
 
-            if float(parsed_data['ont_rx_power']) < -26.5 or float(parsed_data['olt_rx_power']) < -31.5 :
-                parsed_data['troubleshooting'] = "Обнаружен низкий уровень оптического сигнала. Необходима проверка оптической линии."
+            # if any(character.isdigit() for character in parsed_data['ont_rx_power']) and any(character.isdigit() for character in parsed_data['olt_rx_power'])
+            if parsed_data['ont_rx_power'] !='нет данных' and parsed_data['olt_rx_power'] !='нет данных':
+                if float(parsed_data['ont_rx_power']) < -26.5 or float(parsed_data['olt_rx_power']) < -31.5 :
+                    parsed_data['troubleshooting'] = "Обнаружен низкий уровень оптического сигнала. Необходима проверка оптической линии."
+                else:
+                    parsed_data['troubleshooting'] = "Нарушений не выявлено."
             else:
-                parsed_data['troubleshooting'] = "Нарушений не выявлено."
+                parsed_data['troubleshooting'] = "Не удалось определить уровень оптического сигнала! Необходима диагностика терминала."
 
             # Ошибки оптики
             output_optical_errors = send_command(COMMANDS['ont_line_quality'].format(command='display', port=port, ont=ont))
@@ -308,5 +311,6 @@ def main() -> None:
         error_line = traceback.extract_tb(e.__traceback__)[-1].lineno
         msg = f"Ошибка в строке № {error_line}:\n{e}"
         crt.Dialog.MessageBox(msg)
+        crt.Screen.Send("display ont info")
 
 main()
