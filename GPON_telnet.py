@@ -2,7 +2,7 @@
 # $interface = "1.0"
 
 import pyperclip
-import SU_challenge
+# import SU_challenge
 
 # crt.Screen.Synchronous = True	
 
@@ -20,11 +20,11 @@ def main() -> None:
     crt.Screen.Send("GhjuhtcC\r")
     crt.Screen.WaitForString("WAP>")
     crt.Screen.Send("su\r")
-    if (crt.Screen.WaitForString("password:", 1)):
-        try:
-            challenge = "BK7BK5TO"
-            SU_challenge.suPassword(challenge=challenge)
-        except Exception as e:
-            crt.Dialog.MessageBox(f"ERROR! {e}\n Copy a challenge and use a SU_challenge button.")
+    # if (crt.Screen.WaitForString("password:", 1)):
+    #     try:
+    #         challenge = "BK7BK5TO"
+    #         SU_challenge.suPassword(challenge=challenge)
+    #     except Exception as e:
+    #         crt.Dialog.MessageBox(f"ERROR! {e}\n Copy a challenge and use a SU_challenge button.")
            
 main()

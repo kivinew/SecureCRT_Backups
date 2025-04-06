@@ -191,11 +191,14 @@ def main() -> None:
                 parsed_data['down_cause'] = "информация на головной станции не сохранилась."
                 parsed_data['troubleshooting'] = "Интернет не работает."
             elif 'LOFi' in parsed_data['down_cause']:
-                parsed_data['troubleshooting'] = "Обнаружен низкий уровень оптического сигнала. Необходима проверка оптической линии."
-            elif 'LOS' or 'LOSi/LOBi' in parsed_data['down_cause']:
-                parsed_data['troubleshooting'] = "Интернет не работает. Отсутствует оптический сигнал. Необходима проверка оптической линии."
+                parsed_data['down_cause'] += " —  низкий/отсутствует уровень оптического сигнала."
+                parsed_data['troubleshooting'] = "Интернет не работает. Необходима проверка оптической линии."
+            elif 'LOS' in parsed_data['down_cause']:
+                parsed_data['down_cause'] += " — отсутствует оптический сигнал."
+                parsed_data['troubleshooting'] = "Интернет не работает. Необходима проверка оптической линии."
             elif 'dying-gasp' in parsed_data['down_cause']:
-                parsed_data['troubleshooting'] = "Интернет не работает. Последняя запись в логах о выключении питания терминала. Необходима проверка терминала и БП."
+                parsed_data['down_cause'] += " — отключение эл.питания."
+                parsed_data['troubleshooting'] = "Интернет не работает. Необходима проверка терминала и БП."
              
             clipboard_data += (
                 f"Отключён: {parsed_data['downtime']}\n"
@@ -237,7 +240,7 @@ def main() -> None:
             )
 
             # if any(character.isdigit() for character in parsed_data['ont_rx_power']) and any(character.isdigit() for character in parsed_data['olt_rx_power'])
-            if parsed_data['ont_rx_power'] !='нет данных' and parsed_data['olt_rx_power'] !='нет данных':
+            if parsed_data['ont_rx_power'] != 'нет данных' and parsed_data['olt_rx_power'] != 'нет данных':
                 if float(parsed_data['ont_rx_power']) < -26.5 or float(parsed_data['olt_rx_power']) < -31.5 :
                     parsed_data['troubleshooting'] = "Обнаружен низкий уровень оптического сигнала. Необходима проверка оптической линии."
                 else:
