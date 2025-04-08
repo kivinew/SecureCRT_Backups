@@ -42,14 +42,14 @@ Sub Main()
 		condition = crt.Screen.WaitForStrings("Success","Fail","Loading")
 		Select Case condition
 			Case 1
-				' Конфига залита - выход из цикла опроса'
+				' Success. Конфига залита - выход из цикла опроса'
 				status=false
 			Case 2
-				' Сбой конфигурации - выход из цикла опроса
+				' Fail. Сбой конфигурации - выход из цикла опроса
 				status=false
 				crt.Dialog.MessageBox("Configuration error!")
 			Case Else
-				' Пауза 2 сек'
+				' Loading. Пауза 2 сек'
 				crt.Sleep 2000
 			End Select
 	wend 

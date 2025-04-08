@@ -1,6 +1,8 @@
 # $language = "Python3"
 # $interface = "1.0"
 
+# Проверка версии python, используемой SecureCRT
+
 import sys
 import platform
 crt.Dialog.MessageBox(

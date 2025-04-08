@@ -9,7 +9,7 @@
 # TODO:
 # проверка версии ПО для моделей терминалов 245 и 245T
 # проверка массовости
-# mac-address ont
+# ping и mac-address ont
 # =====================================================================
 
 import pyperclip
@@ -76,16 +76,16 @@ parsed_data = {
     "eth_errors": {"fcs": 0, "received_bad_bytes": 0, "sent_bad_bytes": 0},
     "troubleshooting": "Нарушений не выявлено."
 }
-def send_command(command: str) -> str:
+def send_command(command: str, delay=0.1) -> str:
     """Выполнение команды и возврат её вывода с оптимизированными задержками и обработкой."""
     crt.Screen.Send(command + "\r")
     time.sleep(0.2)
     if "display ont info" in command and "by-desc" not in command:
         crt.Screen.Send("q")  # Выход из постраничного вывода
-        time.sleep(0.3)  # Уменьшенная задержка для обычных запросов
+        time.sleep(delay)  # Уменьшенная задержка для обычных запросов
     elif "optical-info" in command or "ont-eth" in command:
         crt.Screen.Send(" ")  # Полный вывод
-        time.sleep(0.7)   #  Увеличенная задержка для optical-info
+        time.sleep(delay)   #  Увеличенная задержка для optical-info
     return read_output()
 
 def read_output() -> str:
@@ -143,7 +143,7 @@ def main() -> None:
         mem_buffer = pyperclip.paste().strip()
         # Если в буфере нет содержимого, то просто выводим команду "display ont info by-desc "
         if not mem_buffer:
-            crt.Screen.Send("display ont info by-desc ")
+            crt.Screen.Send("\rdisplay ont info by-desc ")
             return
 
         # Выход из interface gpon, если нужно
@@ -153,7 +153,7 @@ def main() -> None:
             crt.Screen.Send("quit\r")
 
         # Определение frame, slot, port, ont
-        if re.fullmatch(r'(?i)(48575443|hwtc)[\da-f]{8}', mem_buffer):  # Проверка на серийный номер
+        if re.fullmatch(r'(?i)(48575443|hwtc)[\da-z]{8}', mem_buffer):  # Проверка на серийный номер
             output_ont_info = send_command(COMMANDS['info_by_serial'].format(serial=mem_buffer.upper()))
             frame, slot, port, ont = parse_by_serial(output_ont_info)
             # Сбор базовой информации
@@ -179,12 +179,12 @@ def main() -> None:
 
         # Инициализация строки базовой информации
         clipboard_data = (
-            f"ONT = {frame}/{slot}/{port} {ont}\n"
-            f"Description = {parsed_data['description']}\n"
+            f"ONT = {frame}/{slot}/{port}/{ont}\n"
+            f"Дескрипшн (лицевой счёт) = {parsed_data['description']}\n"
             f"PON SN = {parsed_data['serial']}\n"
             f"Терминал {'доступен' if parsed_data['status'] == 'online' else 'недоступен'}.\n"
         )
-        
+            
         # Расшифровка причин недоступности терминала
         if parsed_data['status'] == 'offline':
             if 'нет данных' in parsed_data['down_cause']:
@@ -295,14 +295,14 @@ def main() -> None:
             
             # Пинг до 8.8.8.8
             if '310' not in parsed_data['model']:
-                send_command(f"ont remote-ping {port} {ont} ip-address 8.8.8.8\r")
+                send_command(f"ont remote-ping {port} {ont} ip-address 8.8.8.8")
+                send_command(f"display ont ipconfig {port} {ont}")
             
             # Покидаем interface gpon
             send_command("quit")
             
             # Проверяем мак-адреса на терминале
             send_command(f"display mac-address ont {frame}/{slot}/{port} {ont}\r")
-
 
             # Рекомендация по результатам диагностики
             clipboard_data += f"\n{parsed_data['troubleshooting']}"  

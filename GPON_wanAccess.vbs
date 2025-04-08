@@ -1,67 +1,74 @@
 ﻿# $language = "Python3"
 # $interface = "1.0"
 
-# для включения веб доступа на терминал необходимо выделить мышкой значение ONT ( например 0 /0 /7 29 )
+# Для включения веб доступа на терминал необходимо выделить мышкой значение ONT (например 0/0/7 29)
 
 import pyperclip
-crt.Screen.Synchronous = True	
+import time
 
-def main():
-	# содержимое буфера обмена помещается в переменную
-	memBuffer = pyperclip.paste()
+crt.Screen.Synchronous = True
 
-	ONT = memBuffer.replace('/', ' ').split()
+# Выбор конфигурации (1 - WanAccess, 0 - WanAccess_HG8245)
+access = 1  # Можно изменить на 0 для другой конфигурации
 
-	frame: str = ONT[0]
-	slot: str  = ONT[1]
-	port: str  = ONT[2]
-	ont: str   = ONT[3]
- 
-	'''
-	 HS8545M5_WAN - 80 порт
-	 WanAccess - порт 88
-	 WanAccess_HG8245 - порт 80
-	 WanAccess | WanAccess_HG8245 
-	'''
+def send_command(command, delay=0.5) -> None:
+    """Отправка команды с задержкой"""
+    crt.Screen.Send(command + "\r")
+    time.sleep(delay)
 
-	# содержит True, если получена указанная в аргументах одна из строк
-	condition: str
+def main() -> None:
+    try:
+        # Получаем данные из буфера обмена
+        mem_buffer = pyperclip.paste().strip()
+        
+        # Проверяем, что данные в буфере соответствуют ожидаемому формату
+        if not all(c.isdigit() or c in ['/', ' '] for c in mem_buffer):
+            raise ValueError ("Неверный формат данных! Ожидается ONT (например: 0/0/7 29)")
+            
+        # Разбираем данные ONT
+        ont_parts = mem_buffer.replace('/', ' ').split()
+        if len(ont_parts) != 4:
+            crt.Dialog.MessageBox("Неверный формат ONT! Ожидается 4 части (frame/slot/port ont)")
+            return
+        frame, slot, port, ont = ont_parts
+        
+        conf = "WanAccess" if access == 1 else "WanAccess_HG8245"
+        # Отправка команд конфигурации
+        send_command("diagnose")
+        send_command(f"ont-load info configuration {conf}.xml ftp 10.2.1.3 huawei ksa5oz6y")
+        send_command(f"ont-load select {frame}/{slot} {port} {ont}")
+        send_command("ont-load start activemode next-startup", 1)
 
-	# состояние заливки конфига в цикле while/wend
-	status: bool = True
-
-	# файл конфигурации
-	conf: str
-	# присвоить 1, если нужен WanAccess.xml
-	# приствоить 0, если нужен WanAccess_HG8245
-	access = 1
-
-	conf = "WanAccess" if access == 1 else "WanAccess_HG8245"
-
-	crt.Screen.Send("diagnose" + chr(13))
-	crt.Screen.Send("ont-load info configuration " + conf + ".xml ftp 10.2.1.3 huawei ksa5oz6y" + chr(13))
-	crt.Screen.Send("ont-load select 0/" + slot + " " + port + " " + ont + chr(13))
-	crt.Screen.Send("ont-load start" + chr(13) + chr(13))
-
-
-	# цикл проверки загрузки конфигурации
-	while (status):
-		
-		crt.Screen.Send("display ont-load select 0/" + slot + " " + port + " " + ont + chr(13))
-		condition = crt.Screen.WaitForString("Success", 1)		#### Ошибка Python AN INTEGER IS REQUIRED!!!
-		#crt.Dialog.MessageBox(str(condition))
-		if condition == 1:
-			status = False
-		elif condition == 2:
-			# Сбой конфигурации - выход из цикла опроса
-			status = False
-			crt.Dialog.MessageBox("Сбой конфигурации!!!")
-		elif condition == 0:
-			# Пауза 2 сек'
-			crt.Sleep(1000)
-
-	# Завершение конфигурации в режиме diagnose
-	crt.Screen.Send("ont-load stop" + chr(13))
-	crt.Screen.Send("config" + chr(13))
+        # Цикл проверки загрузки конфигурации
+        status = True
+        timeout = 60  # Максимальное время ожидания в секундах
+        start_time = time.time()
+        
+        while status and (time.time() - start_time) < timeout:
+            send_command(f"display ont-load select {frame}/{slot} {port} {ont}")
+            
+            # Исправленная проверка условий (WaitForStrings вместо WaitForString)
+            result = crt.Screen.WaitForStrings(["Success", "Fail", "Loading"], 2)
+            
+            if result == 1:  # Success
+                status = False
+                crt.Dialog.MessageBox("Конфигурация успешно загружена!")
+            elif result == 2:  # Fail
+                status = False
+                crt.Dialog.MessageBox("Ошибка загрузки конфигурации!")
+            elif result == 0:  # Таймаут
+                continue
+            else:  # Loading (result == 3)
+                time.sleep(2)
+        
+        if status:  # Если вышли по таймауту
+            crt.Dialog.MessageBox("Превышено время ожидания загрузки конфигурации!")
+        
+        # Завершение конфигурации
+        send_command("ont-load stop")
+        send_command("config")
+        
+    except Exception as e:
+        crt.Dialog.MessageBox(f"Ошибка: {str(e)}")
 
 main()
