@@ -10,19 +10,19 @@ import os
 
 class MainWindow(QMainWindow):
     pass
-    # def __init__(self, *args, **kwargs):
-        # super(MainWindow, self).__init__(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super(MainWindow, self).__init__(*args, **kwargs)
 
-        # self.setWindowTitle("Окно программы")
+        self.setWindowTitle("Окно программы")
         
-        # label = QLabel("Приложение")
-        # label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label = QLabel("Приложение")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # self.setCentralWidget(label)
+        self.setCentralWidget(label)
 
 app = QApplication(sys.argv)
 
 windows = MainWindow()
 windows.show()
 
-app.exec
+app.exec()
