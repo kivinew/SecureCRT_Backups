@@ -40,7 +40,7 @@ PATTERNS = {
     "description": r"Description\s+:\s(\S+)",
     "uptime": r"Last up time\s*:\s*([\d-]+\s[\d:+-]+)",
     "downtime": r"Last down time\s*:\s*([\d-]+\s[\d:+-]+)",
-    "down_cause": r"Last down cause\s+:\s+(\S+)",
+    "downcause": r"Last down cause\s+:\s+(\S+)",
     "distance": r" distance\(m\)\s*:\s*(\d+)",
     "soft_version": r"Main Software Version\s*:\s*(\S*)",
     "ont_model": r"OntProductDescription    : EchoLife (\S+) GPON",
@@ -67,14 +67,14 @@ parsed_data = {
     "distance": "нет данных",
     "uptime": "нет данных",
     "downtime": "нет данных",
-    "down_cause": "нет данных",
+    "downcause": "нет данных",
     "ont_rx_power": "нет данных",
     "olt_rx_power": "нет данных",
     "upstream_errors": "0",
     "downstream_errors": "0",
     "lan_ports": [],
     "eth_errors": {"fcs": 0, "received_bad_bytes": 0, "sent_bad_bytes": 0},
-    "troubleshooting": "Нарушений не выявлено."
+    "troubleshooting": "Сбой диагностики!"
 }
 def send_command(command: str, delay=0.1) -> str:
     """Выполнение команды и возврат её вывода с оптимизированными задержками и обработкой."""
@@ -157,7 +157,7 @@ def main() -> None:
             output_ont_info = send_command(COMMANDS['info_by_serial'].format(serial=mem_buffer.upper()))
             frame, slot, port, ont = parse_by_serial(output_ont_info)
             # Сбор базовой информации
-            for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
+            for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'downcause']:
                 parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
         else:
             ont_data = mem_buffer.replace('/', ' ').split()
@@ -174,7 +174,7 @@ def main() -> None:
 
             # Сбор базовой информации
             output_ont_info = send_command(COMMANDS['ont_info'].format(frame=frame, slot=slot, port=port, ont=ont))
-            for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'down_cause']:
+            for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'downcause']:
                 parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
 
         # Инициализация строки базовой информации
@@ -187,24 +187,27 @@ def main() -> None:
             
         # Расшифровка причин недоступности терминала
         if parsed_data['status'] == 'offline':
-            if 'нет данных' in parsed_data['down_cause']:
-                parsed_data['down_cause'] = "информация на головной станции не сохранилась."
-                parsed_data['troubleshooting'] = "Интернет не работает."
-            elif 'LOFi' in parsed_data['down_cause']:
-                parsed_data['down_cause'] += " —  низкий/отсутствует уровень оптического сигнала."
+            if not any(character.isdigit() for character in parsed_data['downtime']):
+                parsed_data['downtime'] = "нет данных"
+                parsed_data['downcause'] = "нет данных" if '-' in parsed_data['downcause'] else parsed_data['downcause']
+                parsed_data['troubleshooting'] = "Интернет не работает. Запись о причине недоступности терминала отсутствует."
+            elif 'LOFi' in parsed_data['downcause']:
+                parsed_data['downcause'] += " —  низкий/отсутствует уровень оптического сигнала."
                 parsed_data['troubleshooting'] = "Интернет не работает. Необходима проверка оптической линии."
-            elif 'LOS' in parsed_data['down_cause']:
-                parsed_data['down_cause'] += " — отсутствует оптический сигнал."
+            elif 'LOS' in parsed_data['downcause']:
+                parsed_data['downcause'] += " — отсутствует оптический сигнал."
                 parsed_data['troubleshooting'] = "Интернет не работает. Необходима проверка оптической линии."
-            elif 'dying-gasp' in parsed_data['down_cause']:
-                parsed_data['down_cause'] += " — отключение эл.питания."
+            elif 'dying-gasp' in parsed_data['downcause']:
+                parsed_data['downcause'] += " — отключение эл.питания."
                 parsed_data['troubleshooting'] = "Интернет не работает. Необходима проверка терминала и БП."
-             
+            else:
+                raise Exception("Сбой диагностики!")
+                
             clipboard_data += (
                 f"Отключён: {parsed_data['downtime']}\n"
                 f"Время последнего включения: {parsed_data['uptime']}\n"
                 f"Растояние от головной станции (м): {parsed_data['distance']}\n"
-                f"Причина недоступности — {parsed_data['down_cause']}\n"
+                f"Причина недоступности — {parsed_data['downcause']}\n"
                 f"\n{parsed_data['troubleshooting']}"   #   Рекомендация по результатам диагностики
                 )
         
