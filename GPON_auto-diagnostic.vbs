@@ -92,7 +92,7 @@ def read_output() -> str:
     """Чтение вывода в терминал построчно с таймаутом."""
     output = ""
     while True:
-        line = crt.Screen.ReadString("\n", 1)  # Таймаут 1 секунда
+        line = crt.Screen.ReadString("\n", 1)
         if not line:
             break
         output += line
@@ -233,7 +233,7 @@ def main() -> None:
             crt.Screen.Send(f"interface gpon {frame}/{slot}\r")
 
             # Оптическая информация
-            output_optical_info = send_command(COMMANDS['optical_info'].format(port=port, ont=ont))
+            output_optical_info = send_command(COMMANDS['optical_info'].format(port=port, ont=ont), 1)
             parsed_data['ont_rx_power'] = parse_output(output_optical_info, PATTERNS['ont_rx_power'], str) or parsed_data['ont_rx_power']
             parsed_data['olt_rx_power'] = parse_output(output_optical_info, PATTERNS['olt_rx_power'], str) or parsed_data['olt_rx_power']
 
@@ -242,9 +242,8 @@ def main() -> None:
                 f"OLT Rx (сигнал на головной станции)(dBm): {parsed_data['olt_rx_power']}\n"
             )
 
-            # if any(character.isdigit() for character in parsed_data['ont_rx_power']) and any(character.isdigit() for character in parsed_data['olt_rx_power'])
             if parsed_data['ont_rx_power'] != 'нет данных' and parsed_data['olt_rx_power'] != 'нет данных':
-                if float(parsed_data['ont_rx_power']) < -26.5 or float(parsed_data['olt_rx_power']) < -31.5 :
+                if float(parsed_data['ont_rx_power']) < -26.0 or float(parsed_data['olt_rx_power']) < -31.5 :
                     parsed_data['troubleshooting'] = "Обнаружен низкий уровень оптического сигнала. Необходима проверка оптической линии."
                 else:
                     parsed_data['troubleshooting'] = "Нарушений не выявлено."
@@ -298,8 +297,8 @@ def main() -> None:
             
             # Пинг до 8.8.8.8
             if '310' not in parsed_data['model']:
-                send_command(f"ont remote-ping {port} {ont} ip-address 8.8.8.8")
                 send_command(f"display ont ipconfig {port} {ont}")
+                send_command(f"ont remote-ping {port} {ont} ip-address 8.8.8.8")
             
             # Покидаем interface gpon
             send_command("quit")

@@ -1,71 +1,83 @@
 # $language = "Python3"
 # $interface = "1.0"
 
+# crt = None  # глобальная переменная для crt
+
+# class Test():
+# 	def inject_crt(obj_crt):
+# 		global crt
+# 		crt = obj_crt
+
+# 	def send_command(command):
+# 		if crt is not None:
+# 			crt.Screen.Send(command + "\n")
+# 		else:
+# 			print("Ошибка: crt не инициализирован!")
+
 import pyperclip
 crt.Screen.Synchronous = True	
 
-ontInfo = "display ont info " # информация об ONT
-ifaceGpon = "interface gpon "  # интерфейс GPON
-undoServPort = "undo service-port "  # удаление сервис портов
+ont_info = "display ont info" # информация об ONT
+ifaceGpon = "interface gpon"  # интерфейс GPON
+undoServPort = "undo service-port"  # удаление сервис портов
 ontDelete = "ont delete "  # удаление ONT
 
 class Ont():
-	def __init__(self, frame='0', slot='0', port='0', ont_id='0'):
+	def __init__(self, ont[]):
 		self.frame = frame
 		self.slot = slot
 		self.port = port
 		self.ont_id = ont_id
-		self.sn: str = ""
+		self.sn: str = ''
 		self.srvPort: list = []
 
+	def get_ont_info(self) -> None:
+		frame, slot, port, ont = self.frame, self.slot, self.port, self.ont_id
+		crt.Screen.Send(f"{ont_info} {frame} {slot} {port} {ont}\r")
+
 	# вывод конфигурации ONT
-	def getCurrentConfig(self) -> str:
+	def get_current_config(self) -> str:
 		return str(self.srvPort)
 
 	# метод удаления ONT
-	def deleteOnt(self) -> None:
+	def delete_ont(self) -> None:
 		crt.Screen.Send(f'display current-configuration ont {self.frame}/{self.slot}/{self.port} {self.ont_id}\n')
 
-		# поместить вывод команды до строки "return" в буфер
+	# 	# поместить вывод команды до строки "return" в буфер
 		strResult: str = crt.Screen.ReadString('return')
 
-		# разделение строки на список слов
+	# 	# разделение строки на список слов
 		currentConfiguration: list = strResult.replace('\\n', ' ').split()
 
-		# поиск сервис портов в списке слов
+	# 	# поиск сервис портов в списке слов
 		for index, elem in enumerate(currentConfiguration):
 			if elem == 'service-port':
-				crt.Screen.Send(undoServPort + str(currentConfiguration[index + 1]) + '\r')  	# удалить найденный в списке сервис порт
-
-		# удалить ONT с интерфейса GPON
+				# crt.Screen.Send(undoServPort + str(currentConfiguration[index + 1]) + '\r')  	# удалить найденный в списке сервис порт
+				pass
+	# 	# удалить ONT с интерфейса GPON
 		crt.Screen.Send(ifaceGpon + str(self.frame) + '/' + str(self.slot) + '\r')
 		crt.Screen.Send(ontDelete + str(self.port) + ' ' + str(self.ont_id) + '\r')
 		crt.Screen.Send('q\r' + '\r')
 
 	# метод вывода серийника
-	def getSerial(self) -> str:
-
+	def get_serial(self) -> str:
 		return self.sn
 		
 	# метод вывода уровня сигнала	
-	def getOpticalInfo(self) -> str:
-		pass
+	def get_optical_info(self) -> str:
+		crt.Screen.Send(f"display ont optical-info {self.port} {self.ont_id}")
 		return ''
 
-	def setServicePorts(self) -> list:
+	def set_service_ports(self) -> list:
 		return self.srvPort
 
 
-def main():
+def main() -> None:
 
-	memBuffer = pyperclip.paste()
-	ONT = memBuffer.replace('/', ' ').split()
-	frame: str    = ONT[0]
-	slot: str     = ONT[1]
-	port: str     = ONT[2]
-	ont_id: str   = ONT[3]
-	terminal = Ont(frame, slot, port, ont_id)
-	crt.Screen.Send(f'{ontInfo} {frame} {slot} {port} {ont_id}\rq')
-	terminal.getCurrentConfig()
+	mem_buffer = pyperclip.paste().strip()
+	ont: Ont = Ont(mem_buffer.replace('/',' ').split())
+	ont.get_ont_info()
+
 
 main()
+
