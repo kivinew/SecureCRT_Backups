@@ -15,6 +15,7 @@
 # 			print("Ошибка: crt не инициализирован!")
 
 import pyperclip
+
 crt.Screen.Synchronous = True	
 
 ont_info = "display ont info" # информация об ONT
@@ -23,17 +24,17 @@ undoServPort = "undo service-port"  # удаление сервис портов
 ontDelete = "ont delete "  # удаление ONT
 
 class Ont():
-	def __init__(self, ont[]):
-		self.frame = frame
-		self.slot = slot
-		self.port = port
-		self.ont_id = ont_id
+	def __init__(self, ont: list):
+		self.frame = ont[0]
+		self.slot = ont[1]
+		self.port = ont[2]
+		self.ont_id = ont[3]
 		self.sn: str = ''
 		self.srvPort: list = []
 
 	def get_ont_info(self) -> None:
 		frame, slot, port, ont = self.frame, self.slot, self.port, self.ont_id
-		crt.Screen.Send(f"{ont_info} {frame} {slot} {port} {ont}\r")
+		crt.Screen.Send(f"{ont_info} {frame} {slot} {port} {ont}\rq")
 
 	# вывод конфигурации ONT
 	def get_current_config(self) -> str:
@@ -47,7 +48,7 @@ class Ont():
 		strResult: str = crt.Screen.ReadString('return')
 
 	# 	# разделение строки на список слов
-		currentConfiguration: list = strResult.replace('\\n', ' ').split()
+		currentConfiguration: list = strResult.replace('/', ' ').split()
 
 	# 	# поиск сервис портов в списке слов
 		for index, elem in enumerate(currentConfiguration):
