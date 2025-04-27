@@ -1,19 +1,6 @@
 # $language = "Python3"
 # $interface = "1.0"
 
-# crt = None  # глобальная переменная для crt
-
-# class Test():
-# 	def inject_crt(obj_crt):
-# 		global crt
-# 		crt = obj_crt
-
-# 	def send_command(command):
-# 		if crt is not None:
-# 			crt.Screen.Send(command + "\n")
-# 		else:
-# 			print("Ошибка: crt не инициализирован!")
-
 import pyperclip
 
 crt.Screen.Synchronous = True	
@@ -72,13 +59,11 @@ class Ont():
 	def set_service_ports(self) -> list:
 		return self.srvPort
 
-
 def main() -> None:
-
 	mem_buffer = pyperclip.paste().strip()
 	ont: Ont = Ont(mem_buffer.replace('/',' ').split())
 	ont.get_ont_info()
 
-
-main()
+if __name__ == '__main__':
+	main()
 

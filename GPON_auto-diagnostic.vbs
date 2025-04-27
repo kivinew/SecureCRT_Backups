@@ -28,7 +28,8 @@ COMMANDS = {
     'optical_info': "display ont optical-info {port} {ont}",
     'ont_line_quality': "{command} statistics ont-line-quality {port} {ont}",
     'eth_ports': "display ont port state {port} {ont} eth-port all",
-    'eth_errors': "{command} statistics ont-eth {port} {ont} ont-port {lan_id}"
+    'eth_errors': "{command} statistics ont-eth {port} {ont} ont-port {lan_id}",
+    'port_off': "ont port attribute {port} {ont} eth {lan_id} operational-state {state}"
 }
 
 # Регулярные выражения для извлечения данных
@@ -280,6 +281,8 @@ def main() -> None:
                         f"Speed={port_state['speed']} Mbps, Duplex={port_state['duplex']}, "
                         f"Link State={port_state['link_state']}\n"
                     )
+                    send_command(COMMANDS['port_off'].format(port=port, ont=ont, lan_id=port_state['lan_id'], state="off"))
+                    send_command(COMMANDS['port_off'].format(port=port, ont=ont, lan_id=port_state['lan_id'], state="on"))
                     output_eth_errors = send_command(COMMANDS['eth_errors'].format(command='display', port=port, ont=ont, lan_id=port_state['lan_id']))
                     parsed_data['eth_errors'] = parse_eth_errors(output_eth_errors)
                     errors = parsed_data['eth_errors']
@@ -294,7 +297,7 @@ def main() -> None:
                         send_command(COMMANDS['eth_errors'].format(command='clear', port=port, ont=ont, lan_id=port_state['lan_id']))
             
             clipboard_data += ethernet_counters + "Выполнен сброс счётчиков ошибок.\n" if has_eth_errors else "Ошибок портов LAN нет.\n"
-            
+
             # Пинг до 8.8.8.8
             if '310' not in parsed_data['model']:
                 send_command(f"display ont ipconfig {port} {ont}")
