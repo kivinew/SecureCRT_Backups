@@ -237,6 +237,8 @@ def main() -> None:
             output_optical_info = send_command(COMMANDS['optical_info'].format(port=port, ont=ont), 1)
             parsed_data['ont_rx_power'] = parse_output(output_optical_info, PATTERNS['ont_rx_power'], str) or parsed_data['ont_rx_power']
             parsed_data['olt_rx_power'] = parse_output(output_optical_info, PATTERNS['olt_rx_power'], str) or parsed_data['olt_rx_power']
+            parsed_data['ont_rx_power'] = "нет данных" if parsed_data['ont_rx_power'] == '-' else parsed_data['ont_rx_power']
+            parsed_data['olt_rx_power'] = "нет данных" if parsed_data['olt_rx_power'] == '-' else parsed_data['olt_rx_power']
 
             clipboard_data += (
                 f"ONT Rx (оптический сигнал на терминале)(dBm): {parsed_data['ont_rx_power']}\n"
