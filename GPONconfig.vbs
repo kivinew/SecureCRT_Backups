@@ -1,4 +1,4 @@
-#$language = "VBScript"
+﻿anguage = "VBScript"
 #$interface = "1.0"
 
 crt.Screen.Synchronous = False
@@ -25,9 +25,9 @@ status=true
 ' Указать slot, port, ont и имя файла для заливки'
 ' frame = 0 всегда'
 slot        = "11"
-port        = "14"
-ont         = "28"
-file        = "IP"
+port        = "13"
+ont         = "6"
+file        = "all"
 description = ""
 '########################################################################################################'
 

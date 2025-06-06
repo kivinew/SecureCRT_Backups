@@ -16,6 +16,7 @@ import pyperclip
 import re
 import traceback
 import time
+import os, sys
 
 crt.Screen.Synchronous = True
 
@@ -55,7 +56,9 @@ PATTERNS = {
         "fcs": r"Received FCS error frames\s+:\s+(\d+)",
         "received_bad_bytes": r"Received bad bytes\s+:\s+(\d+)",
         "sent_bad_bytes": r"Sent bad bytes\s+:\s+(\d+)"
-    }
+    },
+    "mac_addresses": r"(ETH|WLAN)\s+(\d)+\s+([0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4})",
+    "ping_result": r"IP address of ping\s+:\s+\d+\.\d+\.\d+\.\d+\s+Transmit packets\s+:\s+\d+\s+Receive packets\s+:\s+\d+",
 }
 
 # Инициализация данных
@@ -75,6 +78,8 @@ parsed_data = {
     "downstream_errors": "0",
     "lan_ports": [],
     "eth_errors": {"fcs": 0, "received_bad_bytes": 0, "sent_bad_bytes": 0},
+    "mac_addresses": "нет данных",
+    "ping_result": "нет данных",
     "troubleshooting": "Сбой диагностики!"
 }
 def send_command(command: str, delay=0.1) -> str:
@@ -137,6 +142,41 @@ def parse_eth_errors(output: str) -> dict:
         key: parse_output(output, pattern, int) or 0
         for key, pattern in PATTERNS['eth_errors'].items()
     }
+    
+def parse_mac_addresses(output: str) -> tuple:
+    """Парсинг мак адресов устройств, подключенных к терминалу"""
+    return [
+        {
+            "port_type": match.group(1),
+            "port_number": match.group(2),
+            "mac": match.group(3)
+        }
+        for match in re.finditer(PATTERNS['mac_addresses'], output)
+    ]
+
+def load_mac_database(file_path):
+    mac_db = {}
+    
+    with open(file_path, 'r', encoding='utf-8') as file:
+        for line in file:
+            line = line.strip()
+            
+            # Ищем строки с (hex) или (base 16)
+            match = re.match(r'^([0-9A-Fa-f]{2}[-]?[0-9A-Fa-f]{2}[-]?[0-9A-Fa-f]{2})\s+\(hex\)\s+(.+)|^([0-9A-Fa-f]{6})\s+\(base 16\)\s+(.+)', line)
+            if match:
+                oui = (match.group(1) or match.group(3)).replace('-', '').upper()
+                vendor = (match.group(2) or match.group(4)).strip()
+                # Берем только первое слово из названия
+                first_word = vendor.split()[0] if vendor else ''
+                mac_db[oui] = first_word
+    
+    return mac_db
+
+def get_vendor(mac_address, mac_db):
+    # Очищаем MAC от разделителей и приводим к верхнему регистру
+    cleaned_mac = re.sub(r'[^a-fA-F0-9]', '', mac_address).upper()
+    oui = cleaned_mac[:6]  # Берем первые 6 символов (OUI)
+    return mac_db.get(oui, "") # без подписи для неизвестных вендоров
 
 def main() -> None:
     """Основная логика скрипта."""
@@ -309,10 +349,29 @@ def main() -> None:
             send_command("quit")
             
             # Проверяем мак-адреса на терминале
-            send_command(f"display mac-address ont {frame}/{slot}/{port} {ont}\r")
+            mac_output = send_command(f"display mac-address ont {frame}/{slot}/{port} {ont}\r")
+            
+            # Определяем путь к файлу базы вендоров
+            try:
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                mac_db_path = os.path.join(script_dir, 'oui.txt')
+                MAC_DB = load_mac_database(mac_db_path)
+            except Exception as e:
+                print(f"Ошибка инициализации: {e}", file=sys.stderr)
+                MAC_DB = {}  # Создаем пустую базу в случае ошибки
+                
+            parsed_data['mac_addresses'] = parse_mac_addresses(mac_output)
+            seen_macs = set()  # Множество для отслеживания уникальных MAC-адресов
 
+            for device in parsed_data['mac_addresses']:
+                mac = device['mac']
+                if mac not in seen_macs:  # Если MAC ещё не встречался
+                    seen_macs.add(mac)    # Добавляем в множество
+                    vendor = get_vendor(mac, MAC_DB)  # Получаем вендора
+                    clipboard_data += f"{device['port_type']}{device['port_number']} {mac} — {vendor}\n"
+            
             # Рекомендация по результатам диагностики
-            clipboard_data += f"\n{parsed_data['troubleshooting']}"  
+            clipboard_data += f"\n{parsed_data['troubleshooting']}"
 
         # Копирование в буфер
         pyperclip.copy(clipboard_data)
@@ -321,6 +380,6 @@ def main() -> None:
         error_line = traceback.extract_tb(e.__traceback__)[-1].lineno
         msg = f"Ошибка в строке № {error_line}:\n{e}"
         crt.Dialog.MessageBox(msg)
-        crt.Screen.Send("display ont info")
+        crt.Screen.Send("display ont info ")
 
 main()
