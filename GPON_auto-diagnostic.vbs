@@ -1,4 +1,4 @@
-# $language = "Python3"
+# $language = "Python"
 # $interface = "1.0"
 
 # =====================================================================
@@ -17,21 +17,15 @@ import re
 import traceback
 import time
 import os, sys
+from typing import Tuple, Optional
+# Вывод рабочей директории Secure CRT 
+# crt.Dialog.MessageBox("Working dir: " + os.getcwd())
+# Получаем путь к месту, где запущен скрипт
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(script_dir)
+from GPON_commands import COMMANDS
 
-crt.Screen.Synchronous = True
-
-# Строковые константы
-COMMANDS = {
-    'ont_info': "display ont info {frame} {slot} {port} {ont}",
-    'info_by_serial': "display ont info by-sn {serial}",
-    'info_by_description': "display ont info by-desc {description}",
-    'ont_version': "display ont version {frame} {slot} {port} {ont}",
-    'optical_info': "display ont optical-info {port} {ont}",
-    'ont_line_quality': "{command} statistics ont-line-quality {port} {ont}",
-    'eth_ports': "display ont port state {port} {ont} eth-port all",
-    'eth_errors': "{command} statistics ont-eth {port} {ont} ont-port {lan_id}",
-    'port_off': "ont port attribute {port} {ont} eth {lan_id} operational-state {state}"
-}
+crt.Screen.Synchronous = True # type: ignore
 
 # Регулярные выражения для извлечения данных
 PATTERNS = {
@@ -58,7 +52,11 @@ PATTERNS = {
         "sent_bad_bytes": r"Sent bad bytes\s+:\s+(\d+)"
     },
     "mac_addresses": r"(ETH|WLAN)\s+(\d)+\s+([0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4})",
-    "ping_result": r"IP address of ping\s+:\s+\d+\.\d+\.\d+\.\d+\s+Transmit packets\s+:\s+\d+\s+Receive packets\s+:\s+\d+",
+    "ping_result": {
+        "IP": r"IP address of ping\s+:\s+(\S+)",
+        "transmit": r"Transmit packets\s+:\s+(\d+)",
+        "receive": r"Receive packets\s+:\s+(\d+)"
+    }
 }
 
 # Инициализация данных
@@ -79,51 +77,51 @@ parsed_data = {
     "lan_ports": [],
     "eth_errors": {"fcs": 0, "received_bad_bytes": 0, "sent_bad_bytes": 0},
     "mac_addresses": "нет данных",
-    "ping_result": "нет данных",
+    "ping_result": {"IP": "IP", "transmit": "n/a", "receive": "n/a"},
     "troubleshooting": "Сбой диагностики!"
 }
-def send_command(command: str, delay=0.1) -> str:
-    """Выполнение команды и возврат её вывода с оптимизированными задержками и обработкой."""
+
+def send_command(command: str, delay=0.3) -> str:
     crt.Screen.Send(command + "\r")
-    time.sleep(0.2)
+    if "remote-ping" in command:
+        time.sleep(3)
+    else:
+        time.sleep(delay)
     if "display ont info" in command and "by-desc" not in command:
-        crt.Screen.Send("q")  # Выход из постраничного вывода
-        time.sleep(delay)  # Уменьшенная задержка для обычных запросов
+        crt.Screen.Send("q")
+        time.sleep(delay)
     elif "optical-info" in command or "ont-eth" in command:
-        crt.Screen.Send(" ")  # Полный вывод
-        time.sleep(delay)   #  Увеличенная задержка для optical-info
+        crt.Screen.Send(" ")
+        time.sleep(delay)
     return read_output()
 
-def read_output() -> str:
-    """Чтение вывода в терминал построчно с таймаутом."""
+def read_output(prompt='#', timeout=1) -> str:
     output = ""
-    while True:
-        line = crt.Screen.ReadString("\n", 1)
-        if not line:
-            break
-        output += line
+    chunk = crt.Screen.ReadString(prompt, timeout)
+    if chunk:
+        output += chunk
     return output
 
-def parse_output(output: str, pattern: str, transform=lambda x: x) -> str:
+def parse_output(output: str, pattern: str, transform=lambda x: x) -> Optional[Tuple[str, str, str, str]]:
     """Парсинг вывода с использованием регулярных выражений."""
     match = re.search(pattern, output)
     return transform(match.group(1)) if match else None
 
-def parse_by_description(output: str) -> tuple:
+def ont_by_description(output: str) -> Optional[Tuple]:
     """Извлечение frame, slot, port и ont из вывода команды display ont info by-desc."""
     match = re.search(PATTERNS['ont_by_desc'], output)
     if match:
         return match.groups()
     raise ValueError("Не удалось найти данные ONT по дескрипшену!")
 
-def parse_by_serial(output: str) -> tuple:
+def ont_by_serial(output: str) -> Optional[Tuple]:
     """Извлечение frame, slot, port и ont из вывода команды display ont info by-desc."""
     match = re.search(PATTERNS['ont_by_serial'], output)
     if match:
         return match.groups()
     raise ValueError("Не удалось найти данные ONT по серийному номеру!")
 
-def parse_lan_ports(output: str) -> list:
+def parse_lan_ports(output: str) -> Optional[list]:
     """Парсинг состояния LAN портов."""
     return [
         {
@@ -136,14 +134,14 @@ def parse_lan_ports(output: str) -> list:
         for match in re.finditer(PATTERNS['lan_ports'], output)
     ]
 
-def parse_eth_errors(output: str) -> dict:
+def parse_eth_errors(output: str) -> Optional[dict]:
     """Парсинг ошибок Ethernet."""
     return {
         key: parse_output(output, pattern, int) or 0
         for key, pattern in PATTERNS['eth_errors'].items()
     }
     
-def parse_mac_addresses(output: str) -> tuple:
+def parse_mac_addresses(output: str) -> Optional[list]:
     """Парсинг мак адресов устройств, подключенных к терминалу"""
     return [
         {
@@ -153,6 +151,19 @@ def parse_mac_addresses(output: str) -> tuple:
         }
         for match in re.finditer(PATTERNS['mac_addresses'], output)
     ]
+
+def parse_ping_result(output: str) -> Optional[dict]:
+    """Парсинг результата пинга """
+    ip_match = re.search(PATTERNS['ping_result']['IP'], output)
+    tx_match = re.search(PATTERNS['ping_result']['transmit'], output)
+    rx_match = re.search(PATTERNS['ping_result']['receive'], output)
+    if ip_match and tx_match and rx_match:
+        return {
+            "IP": ip_match.group(1),
+            "transmit": tx_match.group(1),
+            "receive": rx_match.group(1)
+        }
+    # return None
 
 def load_mac_database(file_path):
     mac_db = {}
@@ -176,7 +187,7 @@ def get_vendor(mac_address, mac_db):
     # Очищаем MAC от разделителей и приводим к верхнему регистру
     cleaned_mac = re.sub(r'[^a-fA-F0-9]', '', mac_address).upper()
     oui = cleaned_mac[:6]  # Берем первые 6 символов (OUI)
-    return mac_db.get(oui, 'n/a') # для неизвестных вендоров
+    return mac_db.get(oui, "") # без подписи для неизвестных вендоров
 
 def main() -> None:
     """Основная логика скрипта."""
@@ -196,7 +207,7 @@ def main() -> None:
         # Определение frame, slot, port, ont
         if re.fullmatch(r'(?i)(48575443|hwtc)[\da-z]{8}', mem_buffer):  # Проверка на серийный номер
             output_ont_info = send_command(COMMANDS['info_by_serial'].format(serial=mem_buffer.upper()))
-            frame, slot, port, ont = parse_by_serial(output_ont_info)
+            frame, slot, port, ont = ont_by_serial(output_ont_info)
             # Сбор базовой информации
             for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'downcause']:
                 parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
@@ -206,7 +217,7 @@ def main() -> None:
                 frame, slot, port, ont = ont_data
             elif 4 < len(mem_buffer) <= 16:  # Во всех остальных случаях считаем это дескрипшеном
                 output = send_command(COMMANDS['info_by_description'].format(description=mem_buffer))
-                frame, slot, port, ont = parse_by_description(output)
+                frame, slot, port, ont = ont_by_description(output)
             else:
                 raise ValueError("Несоответствующее запросу содержимое буфера обмена!\n"
                                  f"(длина {len(mem_buffer)})\n"
@@ -247,7 +258,7 @@ def main() -> None:
             clipboard_data += (
                 f"Отключён: {parsed_data['downtime']}\n"
                 f"Время последнего включения: {parsed_data['uptime']}\n"
-                f"Растояние от головной станции (м): {parsed_data['distance']}\n"
+                f"Расстояние от головной станции (м): {parsed_data['distance']}\n"
                 f"Причина недоступности — {parsed_data['downcause']}\n"
                 f"\n{parsed_data['troubleshooting']}"   #   Рекомендация по результатам диагностики
                 )
@@ -297,7 +308,7 @@ def main() -> None:
             output_optical_errors = send_command(COMMANDS['ont_line_quality'].format(command='display', port=port, ont=ont))
             parsed_data['upstream_errors'] = parse_output(output_optical_errors, PATTERNS['upstream_errors'], int) or 0
             parsed_data['downstream_errors'] = parse_output(output_optical_errors, PATTERNS['downstream_errors'], int) or 0
-            optic_errors = parsed_data['upstream_errors'] + parsed_data['downstream_errors']
+            optic_errors: int = int(str(parsed_data['upstream_errors'])) + int(str(parsed_data['downstream_errors']))
             if optic_errors:
                 prefix = "Обнаружено значительное количество ошибок оптики: " if optic_errors > 10000 else "Незначительное количество ошибок оптики: "
                 clipboard_data += (
@@ -316,35 +327,38 @@ def main() -> None:
             ethernet_counters = ""
             has_eth_errors = False
 
-            for port_state in parsed_data['lan_ports']:
-                if port_state['link_state'] == 'up':
-                    clipboard_data += (
-                        f"LAN{port_state['lan_id']}: Type={port_state['port_type']}, "
-                        f"Speed={port_state['speed']} Mbps, Duplex={port_state['duplex']}, "
-                        f"Link State={port_state['link_state']}\n"
-                    )
+            if parsed_data['lan_ports']:
+                for port_state in parsed_data['lan_ports']:
+                    if port_state['link_state'] == 'up':
+                        clipboard_data += (
+                            f"LAN{port_state['lan_id']}: Type={port_state['port_type']}, "
+                            f"Speed={port_state['speed']} Mbps, Duplex={port_state['duplex']}\n"
+                        )
                     send_command(COMMANDS['port_off'].format(port=port, ont=ont, lan_id=port_state['lan_id'], state="off"))
                     send_command(COMMANDS['port_off'].format(port=port, ont=ont, lan_id=port_state['lan_id'], state="on"))
                     output_eth_errors = send_command(COMMANDS['eth_errors'].format(command='display', port=port, ont=ont, lan_id=port_state['lan_id']))
                     parsed_data['eth_errors'] = parse_eth_errors(output_eth_errors)
                     errors = parsed_data['eth_errors']
-                    if any(errors.values()):
-                        has_eth_errors = True
-                        ethernet_counters += (
-                            f"Обнаружены ошибки на порту LAN{port_state['lan_id']}: "
-                            f"FCS = {errors['fcs']}. "
-                            f"Input = {errors['received_bad_bytes']}. "
-                            f"Output = {errors['sent_bad_bytes']}.\n"
-                        )
-                        send_command(COMMANDS['eth_errors'].format(command='clear', port=port, ont=ont, lan_id=port_state['lan_id']))
+                    if errors:
+                        if any(errors.values()):
+                            has_eth_errors = True
+                            ethernet_counters += (
+                                f"Обнаружены ошибки на порту LAN{port_state['lan_id']}: "
+                                f"FCS = {errors['fcs']}. "
+                                f"Input = {errors['received_bad_bytes']}. "
+                                f"Output = {errors['sent_bad_bytes']}.\n"
+                            )
+                            send_command(COMMANDS['eth_errors'].format(command='clear', port=port, ont=ont, lan_id=port_state['lan_id']))
             
             clipboard_data += ethernet_counters + "Выполнен сброс счётчиков ошибок.\n" if has_eth_errors else "Ошибок портов LAN нет.\n"
 
-            # Пинг до 8.8.8.8
+            # Пинг до 8.8.4.4
             if '310' not in parsed_data['model']:
                 send_command(f"display ont ipconfig {port} {ont}")
-                send_command(f"ont remote-ping {port} {ont} ip-address 8.8.8.8")
-            
+                parsed_data['remote_ping'] = send_command(COMMANDS['remote_ping'].format(port=port, ont=ont, ip='8.8.4.4'))
+                # parsed_data['ping_result'] = parse_ping_result(output_ping)
+                # crt.Dialog.MessageBox(str(output_ping))
+                # crt.Dialog.MessageBox(str(parsed_data['ping_result']))
             # Покидаем interface gpon
             send_command("quit")
             
@@ -360,26 +374,41 @@ def main() -> None:
                 print(f"Ошибка инициализации: {e}", file=sys.stderr)
                 MAC_DB = {}  # Создаем пустую базу в случае ошибки
                 
+            
+            parsed_data['ping_result'] = parse_ping_result(output_ping)
             parsed_data['mac_addresses'] = parse_mac_addresses(mac_output)
             seen_macs = set()  # Множество для отслеживания уникальных MAC-адресов
 
-            for device in parsed_data['mac_addresses']:
-                mac = device['mac']
-                if mac not in seen_macs:  # Если MAC ещё не встречался
-                    seen_macs.add(mac)    # Добавляем в множество
-                    vendor = get_vendor(mac, MAC_DB)  # Получаем вендора
-                    clipboard_data += f"{'LAN' if device['port_type'] == 'ETH' else device['port_type']}{device['port_number']} {mac} — {vendor}\n"
+            if parsed_data['mac_addresses']:
+                for device in parsed_data['mac_addresses']:
+                    mac = device['mac']
+                    if mac not in seen_macs:  # Если MAC ещё не встречался
+                        seen_macs.add(mac)    # Добавляем в множество
+                        vendor = get_vendor(mac, MAC_DB)  # Получаем вендора
+                        clipboard_data += f"{'LAN' if device['port_type'] == 'ETH' else device['port_type']}{device['port_number']} {mac} — {vendor}\n"
+            
+            if parsed_data['ping_result']:
+                pr = parsed_data['ping_result']  # dict
+                clipboard_data += (
+                    f"IP: {pr['IP']}\n"
+                    f"Transmit: {pr['transmit']}\n"
+                    f"Receive: {pr['receive']}\n"
+                )
+            else:
+                clipboard_data += "\nПинг недоступен\n"
+
             
             # Рекомендация по результатам диагностики
             clipboard_data += f"\n{parsed_data['troubleshooting']}"
 
         # Копирование в буфер
         pyperclip.copy(clipboard_data)
+        time.sleep(0.1)
 
     except Exception as e:
         error_line = traceback.extract_tb(e.__traceback__)[-1].lineno
-        msg = f"Ошибка в строке № {error_line}:\n{e}"
+        tb = traceback.format_exc()
+        msg = f"Ошибка в строке № {error_line}:\n{e}\n{tb}"
         crt.Dialog.MessageBox(msg)
-        crt.Screen.Send("display ont info ")
-
+        crt.Screen.Send("q\ndisplay ont info ")
 main()

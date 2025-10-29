@@ -1,4 +1,4 @@
-# $language = "Python3"
+# $language = "Python"
 # $interface = "1.0"
 
 # Для проверки уровня сигнала скопируй в буфер обмена строку ONT формата "x/xx"

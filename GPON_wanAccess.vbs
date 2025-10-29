@@ -1,4 +1,4 @@
-﻿# $language = "Python3"
+﻿# $language = "Python"
 # $interface = "1.0"
 
 # Для включения веб доступа на терминал необходимо выделить мышкой значение ONT (например 0/0/7 29)
@@ -22,10 +22,7 @@ def main() -> None:
         mem_buffer = pyperclip.paste().strip()
         
         # Проверяем, что данные в буфере соответствуют ожидаемому формату
-        mem_buffer = mem_buffer.replace('/', ' ') # заменяем \n на пробелы
-        if not all(c.isdigit() or c in ['/', ' ', '\n'] for c in mem_buffer):
-            raise ValueError ("Неверный формат данных! Ожидается ONT (например:\n 0 0 7 29)")
-        ont_parts = mem_buffer.replace('/', ' ').split()
+        ont_parts = mem_buffer.replace('/', ' ').split() # заменяем \n на пробелы
             
         # Разбираем данные ONT
         if len(ont_parts) != 4:

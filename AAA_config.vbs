@@ -10,6 +10,7 @@ Sub Main
 	crt.Screen.Send "config" & chr(13)
 	crt.Screen.Send "aaa authentication login radius local" & chr(13)
 	crt.Screen.Send "aaa authentication enable radius enable" & chr(13)
+	crt.Screen.Send "aaa authorization dot1x radius" & chr(13)
 	crt.Screen.Send "aaa accounting system radius" & chr(13)
 	crt.Screen.Send "aaa accounting exec start-stop radius" & chr(13)
 	crt.Screen.Send "aaa accounting dot1x start-stop radius" & chr(13)

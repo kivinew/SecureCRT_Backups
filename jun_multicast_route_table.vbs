@@ -1,4 +1,4 @@
-# $language = "Python3"
+# $language = "Python"
 # $interface = "1.0"
 
 import time

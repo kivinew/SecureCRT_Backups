@@ -1,4 +1,4 @@
-# $language = "Python3"
+# $language = "Python"
 # $interface = "1.0"
 
 # Для запуска мультикаста в VLC плеере скопируй IP адрес в буфер обмена и нажми кнопку на панели SecureCRT

@@ -1,4 +1,4 @@
-# $language = "Python3"
+# $language = "Python"
 # $interface = "1.0"
 
 # Для получения скорости Download - Upload скопируй номер сервис порта

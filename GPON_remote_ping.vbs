@@ -1,4 +1,4 @@
-# $language = "Python3"
+# $language = "Python"
 # $interface = "1.0"
 
 import pyperclip
@@ -17,8 +17,8 @@ def main():
 	ont   = ONT[3]
 
 
-	crt.Screen.Send("interface gpon " + frame + "/" + slot + chr(13))
-	crt.Screen.Send("ont remote-ping " + port + " " + ont + " ip-address 8.8.8.8"+ chr(13))
+	crt.Screen.Send("\rinterface gpon " + frame + "/" + slot + chr(13))
+	crt.Screen.Send("ont remote-ping " + port + " " + ont + " ip-address 8.8.4.4"+ chr(13))
 	crt.Screen.Send("q\r")
 	
 main()

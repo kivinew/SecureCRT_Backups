@@ -1,5 +1,7 @@
-# $language = "Python3"
+# $language = "Python"
 # $interface = "1.0"
+
+# Класс для работы с терминалами Huawei
 
 import pyperclip
 
@@ -64,6 +66,4 @@ def main() -> None:
 	ont: Ont = Ont(mem_buffer.replace('/',' ').split())
 	ont.get_ont_info()
 
-if __name__ == '__main__':
-	main()
-
+main()
