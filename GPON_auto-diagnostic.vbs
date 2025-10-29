@@ -176,7 +176,7 @@ def get_vendor(mac_address, mac_db):
     # Очищаем MAC от разделителей и приводим к верхнему регистру
     cleaned_mac = re.sub(r'[^a-fA-F0-9]', '', mac_address).upper()
     oui = cleaned_mac[:6]  # Берем первые 6 символов (OUI)
-    return mac_db.get(oui, "") # без подписи для неизвестных вендоров
+    return mac_db.get(oui, 'n/a') # для неизвестных вендоров
 
 def main() -> None:
     """Основная логика скрипта."""
@@ -368,7 +368,7 @@ def main() -> None:
                 if mac not in seen_macs:  # Если MAC ещё не встречался
                     seen_macs.add(mac)    # Добавляем в множество
                     vendor = get_vendor(mac, MAC_DB)  # Получаем вендора
-                    clipboard_data += f"{device['port_type']}{device['port_number']} {mac} — {vendor}\n"
+                    clipboard_data += f"{'LAN' if device['port_type'] == 'ETH' else device['port_type']}{device['port_number']} {mac} — {vendor}\n"
             
             # Рекомендация по результатам диагностики
             clipboard_data += f"\n{parsed_data['troubleshooting']}"

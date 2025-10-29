@@ -22,13 +22,14 @@ def main() -> None:
         mem_buffer = pyperclip.paste().strip()
         
         # Проверяем, что данные в буфере соответствуют ожидаемому формату
-        if not all(c.isdigit() or c in ['/', ' '] for c in mem_buffer):
-            raise ValueError ("Неверный формат данных! Ожидается ONT (например: 0/0/7 29)")
+        mem_buffer = mem_buffer.replace('/', ' ') # заменяем \n на пробелы
+        if not all(c.isdigit() or c in ['/', ' ', '\n'] for c in mem_buffer):
+            raise ValueError ("Неверный формат данных! Ожидается ONT (например:\n 0 0 7 29)")
+        ont_parts = mem_buffer.replace('/', ' ').split()
             
         # Разбираем данные ONT
-        ont_parts = mem_buffer.replace('/', ' ').split()
         if len(ont_parts) != 4:
-            crt.Dialog.MessageBox("Неверный формат ONT! Ожидается 4 части (frame/slot/port ont)")
+            crt.Dialog.MessageBox("Неверный формат ONT! Ожидается 4 части (frame/slot/port/ont)")
             return
         frame, slot, port, ont = ont_parts
         
