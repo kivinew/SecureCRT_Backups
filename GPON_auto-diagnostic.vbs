@@ -77,14 +77,16 @@ parsed_data = {
     "lan_ports": [],
     "eth_errors": {"fcs": 0, "received_bad_bytes": 0, "sent_bad_bytes": 0},
     "mac_addresses": "нет данных",
-    "ping_result": {"IP": "IP", "transmit": "n/a", "receive": "n/a"},
+    "ping_result": {"Ping to IP": "IP", "transmit": "n/a", "receive": "n/a"},
     "troubleshooting": "Сбой диагностики!"
 }
 
 def send_command(command: str, delay=0.3) -> str:
     crt.Screen.Send(command + "\r")
+    flag=''
     if "remote-ping" in command:
-        time.sleep(3)
+        flag='ping'
+        time.sleep(delay)
     else:
         time.sleep(delay)
     if "display ont info" in command and "by-desc" not in command:
@@ -93,16 +95,19 @@ def send_command(command: str, delay=0.3) -> str:
     elif "optical-info" in command or "ont-eth" in command:
         crt.Screen.Send(" ")
         time.sleep(delay)
-    return read_output()
+    return read_output(flag)
 
-def read_output(prompt='#', timeout=1) -> str:
+def read_output(flag='', prompt='#', timeout=1) -> str:
     output = ""
+    if flag:
+        prompt='Error Code'
+        timeout=2
     chunk = crt.Screen.ReadString(prompt, timeout)
     if chunk:
         output += chunk
     return output
 
-def parse_output(output: str, pattern: str, transform=lambda x: x) -> Optional[Tuple[str, str, str, str]]:
+def parse_output(output: str, pattern: str, transform=lambda x: x) -> Optional[Tuple]:
     """Парсинг вывода с использованием регулярных выражений."""
     match = re.search(pattern, output)
     return transform(match.group(1)) if match else None
@@ -207,7 +212,8 @@ def main() -> None:
         # Определение frame, slot, port, ont
         if re.fullmatch(r'(?i)(48575443|hwtc)[\da-z]{8}', mem_buffer):  # Проверка на серийный номер
             output_ont_info = send_command(COMMANDS['info_by_serial'].format(serial=mem_buffer.upper()))
-            frame, slot, port, ont = ont_by_serial(output_ont_info)
+            if output_ont_info:    
+                frame, slot, port, ont = ont_by_serial(output_ont_info)
             # Сбор базовой информации
             for key in ['status', 'distance', 'serial', 'description', 'uptime', 'downtime', 'downcause']:
                 parsed_data[key] = parse_output(output_ont_info, PATTERNS[key]) or parsed_data[key]
@@ -355,10 +361,8 @@ def main() -> None:
             # Пинг до 8.8.4.4
             if '310' not in parsed_data['model']:
                 send_command(f"display ont ipconfig {port} {ont}")
-                parsed_data['remote_ping'] = send_command(COMMANDS['remote_ping'].format(port=port, ont=ont, ip='8.8.4.4'))
-                # parsed_data['ping_result'] = parse_ping_result(output_ping)
-                # crt.Dialog.MessageBox(str(output_ping))
-                # crt.Dialog.MessageBox(str(parsed_data['ping_result']))
+                output_ping = send_command(COMMANDS['remote_ping'].format(port=port, ont=ont, ip='1.1.1.1'), delay=3)
+                parsed_data['ping_result'] = parse_ping_result(output_ping)
             # Покидаем interface gpon
             send_command("quit")
             
@@ -375,7 +379,6 @@ def main() -> None:
                 MAC_DB = {}  # Создаем пустую базу в случае ошибки
                 
             
-            parsed_data['ping_result'] = parse_ping_result(output_ping)
             parsed_data['mac_addresses'] = parse_mac_addresses(mac_output)
             seen_macs = set()  # Множество для отслеживания уникальных MAC-адресов
 
@@ -390,9 +393,9 @@ def main() -> None:
             if parsed_data['ping_result']:
                 pr = parsed_data['ping_result']  # dict
                 clipboard_data += (
-                    f"IP: {pr['IP']}\n"
-                    f"Transmit: {pr['transmit']}\n"
-                    f"Receive: {pr['receive']}\n"
+                    f"Пинг до IP: {pr['IP']}\n"
+                    f"Отправлено: {pr['transmit']}\n"
+                    f"Получено: {pr['receive']}\n"
                 )
             else:
                 clipboard_data += "\nПинг недоступен\n"
