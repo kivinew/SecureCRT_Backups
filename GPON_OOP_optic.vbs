@@ -22,7 +22,6 @@ inject_crt(crt)
 def main():
     """
     Основной цикл работы SecureCRT-скрипта.
-    Читает буфер обмена, создает и удаляет объект Ont.
     """
     if not crt.Session.Connected:
         crt.Dialog.MessageBox("Нет активного соединения!")
@@ -35,7 +34,7 @@ def main():
     ontSelect = memBuffer.replace('/', ' ').split()
     ont = Ont(ontSelect)
     try:
-        ont.delete_ont()
+        ont.get_optic()
     except Exception as e:
         crt.Dialog.MessageBox(f"Ошибка при удалении ONT:\r{e}")
 main()  
