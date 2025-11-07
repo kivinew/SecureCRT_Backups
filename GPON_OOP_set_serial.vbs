@@ -29,11 +29,12 @@ def main():
     crt.Screen.Synchronous = True
     try:
         memBuffer = pyperclip.paste()
-        ontSelect = memBuffer.replace('/', ' ').split()
-        if len(ontSelect) < 4 or not all(item.isdigit() for item in ontSelect[:4]):
-            raise ValueError("Значение ONT должно быть представлено числами, например: 0/1/2 3")
-        ont = Ont(ontSelect)
-        ont.get_optic()
+    except pyperclip.PyperclipException as e:
+        crt.Dialog.MessageBox(f"Ошибка чтения буфера обмена:\r{e}")
+    ontSelect = memBuffer.replace('/', ' ').split()[:4]
+    ont = Ont(ontSelect)
+    try:
+        ont.set_serial(serial=ontSelect[4])
     except Exception as e:
-        crt.Dialog.MessageBox(f"Ошибка при проверке оптического сигнала:\r{e}")
+        crt.Dialog.MessageBox(f"Ошибка при смене серийного номера ONT:\r{e}")
 main()  

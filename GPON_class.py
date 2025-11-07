@@ -19,15 +19,17 @@ def inject_crt(obj):
     crt = obj
 
 class Ont:
-    def __init__(self, ontList:list=[]):
+    def __init__(self, ontSelect:list=[]):
         """Инициализация объекта ONT из списка параметров (frame, slot, port, ont)."""
-        if ontList is None or len(ontList) < 4:
+        memBuffer = pyperclip.paste()
+        ontSelect = memBuffer.replace('/', ' ').split()
+        if ontSelect is None or len(ontSelect) < 4:
             raise ValueError("Некорректное содержимое буфера")
-        self.frame = ontList[0]
-        self.slot = ontList[1]
-        self.port = ontList[2]
-        self.ont = ontList[3]
-        self.sn = ""
+        self.frame = ontSelect[0]
+        self.slot = ontSelect[1]
+        self.port = ontSelect[2]
+        self.ont = ontSelect[3]
+        self.sn = ontSelect[4] if len(ontSelect) > 4 else ""
 
     def delete_ont(self) -> None:
         """
@@ -69,19 +71,20 @@ class Ont:
 
     def set_serial(self, serial: str) -> None:
         """Устанавливает серийный номер ONT."""
+        scr = crt.Screen
         if crt is None:
             raise RuntimeError("CRT не инициализирован.")
+        scr.Send(f"{ifaceGpon} {self.frame}/{self.slot}\r")
         self.sn = serial
 
 if __name__ == "builtins":
     try:
         memBuffer = pyperclip.paste()
-    except pyperclip.PyperclipException as e:
-        crt.Dialog.MessageBox(f"Ошибка чтения буфера обмена:\r{e}")
-    ontSelect = memBuffer.replace('/', ' ').split()
-    try:
+        ontSelect = memBuffer.replace('/', ' ').split()
         ont = Ont(ontSelect)
         ont.get_info()
+    except pyperclip.PyperclipException as e:
+        crt.Dialog.MessageBox(f"Ошибка чтения буфера обмена:\r{e}")
     except ValueError as e:
         crt.Dialog.MessageBox(f"Ошибка при получении данных об ONT: {e}")
     except Exception as e:

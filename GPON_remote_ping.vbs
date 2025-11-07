@@ -18,7 +18,7 @@ def main():
 
 
 	crt.Screen.Send("\rinterface gpon " + frame + "/" + slot + chr(13))
-	crt.Screen.Send("ont remote-ping " + port + " " + ont + " ip-address 8.8.4.4"+ chr(13))
+	crt.Screen.Send("ont remote-ping " + port + " " + ont + " ip-address 1.1.1.1"+ chr(13))
 	crt.Screen.Send("q\r")
 	
 main()
