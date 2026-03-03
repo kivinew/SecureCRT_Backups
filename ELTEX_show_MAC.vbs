@@ -11,6 +11,6 @@ def main():
 	
 	mac = pyperclip.paste()
 	
-	crt.Screen.Send(f'show mac interface ont 0-3 include mac-address {mac}\r')
+	crt.Screen.Send(f'show mac interface gpon-port 0-3 include mac-address {mac}\r')
 	
 main()

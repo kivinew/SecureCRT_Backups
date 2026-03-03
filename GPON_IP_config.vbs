@@ -70,7 +70,7 @@ def main() -> None:
         
         # Проверка связи
         send_command(f"interface gpon {frame}/{slot}")
-        send_command(f"ont remote-ping {port} {ont} ip-address 8.8.8.8")
+        send_command(f"ont remote-ping {port} {ont} ip-address 1.1.1.1")
         # Проверка WAN интерфейса для определенных конфигураций
         if config_file in ["all", "IP", "IP2", "inet_tv_wifi_vlan2"]:
             send_command(f"display ont ipconfig {port} {ont}")

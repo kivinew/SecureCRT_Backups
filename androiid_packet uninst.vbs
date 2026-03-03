@@ -7,7 +7,7 @@ Sub Main
   strSelection = Trim(crt.Screen.Selection)
   crt.Screen.Send "su" & chr(13)
   crt.Screen.WaitForString " #"
-  crt.Screen.Send "pm uninstall " & strSelection & chr(13)
+  crt.Screen.Send "pm uninstall -k " & strSelection & chr(13)
   crt.Screen.WaitForString " #"
   crt.Screen.Send "exit" & chr(13)
 End Sub
