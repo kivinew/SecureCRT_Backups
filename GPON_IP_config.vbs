@@ -7,8 +7,8 @@ import pyperclip
 crt.Screen.Synchronous = False
 
 # Параметры конфигурации
-# Укажи файл ???.xml
-config_file = "IP"
+# Укажи файл ???.xml (IP или  IP+LAN+WANacc)
+config_file = "IP+LAN+WANacc"
 
 def send_command(command, delay=0.5) -> None:
     """Отправка команды с задержкой"""
