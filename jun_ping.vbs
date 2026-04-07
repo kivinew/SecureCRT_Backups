@@ -15,7 +15,7 @@ def main():
     memBuffer = pyperclip.paste().strip()  # Удаляем лишние пробелы
     if memBuffer:
         if is_valid_ip(memBuffer):
-            sendRequest = "ping " + memBuffer + " record-route" + chr(13)
+            sendRequest = "ping " + memBuffer + " record-route detail" + chr(13)
             crt.Screen.Send(sendRequest)
         else:
             crt.Screen.Send("ping ")

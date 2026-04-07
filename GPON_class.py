@@ -28,7 +28,7 @@ COMMANDS = {
     'ont_line_quality': "{command} statistics ont-line-quality {port} {ont}",
     'eth_ports': "display ont port state {port} {ont} eth-port all",
     'eth_errors': "{command} statistics ont-eth {port} {ont} ont-port {lan_id}",
-    'port_off': "ont port attribute {port} {ont} eth {lan_id} operational-state {state}",
+    'port_switch': "ont port attribute {port} {ont} eth {lan_id} operational-state {state}",
     'remote_ping': "ont remote-ping {port} {ont} ip-address {ip}"
 }
 
