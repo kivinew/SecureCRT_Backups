@@ -3,20 +3,19 @@
 
 import pyperclip
 
-# Текстовые константы
-pressQ = "( Press 'Q' to break ) ----"
-ont_info = "display ont info" # информация об ONT
-optic = "display ont optical-info" 
-servicePorts = "display current-configuration ont " # конфигурация ont
-ifaceGpon = "interface gpon "
-undoServPort = "undo service-port port"
-ont_delete = "ont delete "
-
 # Глобальная ссылка на объект crt (инициализируется из основного скрипта)
 def inject_crt(obj):
     """Инъекция SecureCRT-объекта crt. Вызывать обязательно из основного скрипта после импорта этого модуля."""
     global crt
     crt = obj
+
+# Текстовые константы
+pressQ = "( Press 'Q' to break ) ----"
+ont_info = "display ont info" # информация об ONT
+optic = "display ont optical-info" 
+servicePorts = "display current-configuration ont " # конфигурация ont
+undoServPort = "undo service-port port"
+ont_delete = "ont delete "
 
 # команды головной станции Huawei
 COMMANDS = {
@@ -29,7 +28,9 @@ COMMANDS = {
     'eth_ports': "display ont port state {port} {ont} eth-port all",
     'eth_errors': "{command} statistics ont-eth {port} {ont} ont-port {lan_id}",
     'port_switch': "ont port attribute {port} {ont} eth {lan_id} operational-state {state}",
-    'remote_ping': "ont remote-ping {port} {ont} ip-address {ip}"
+    'remote_ping': "ont remote-ping {port} {ont} ip-address {ip}",
+    'pressQ': "( Press 'Q' to break ) ----",
+
 }
 
 class Ont:
@@ -59,7 +60,7 @@ class Ont:
             scr.Send("\r")
             scr.WaitForString("(y/n)", 5)
             scr.Send("y\r")
-            scr.Send(f"{ifaceGpon} {self.frame}/{self.slot}\r")
+            scr.Send(f"interface gpon {self.frame}/{self.slot}\r")
             scr.Send(f"{ont_delete} {self.port} {self.ont}\r")
             scr.Send("q\r")
         except Exception as e:
@@ -70,9 +71,9 @@ class Ont:
         scr = crt.Screen
         if crt is None:
             raise RuntimeError("CRT не инициализирован.")
-        scr.Send(f"{ifaceGpon} {self.frame}/{self.slot}\r")
-        scr.Send(f"{optic} {self.port} {self.ont}\r")
-        scr.Send(" quit\r")
+        scr.Send(f"interface gpon {self.frame}/{self.slot}\r")
+        scr.Send(COMMANDS['optical_info'].format(port=self.port, ont=self.ont))
+        scr.Send("\r quit\r")
 
     def get_info(self) -> None:
         """Получает информацию об ONT."""
@@ -88,7 +89,7 @@ class Ont:
         scr = crt.Screen
         if crt is None:
             raise RuntimeError("CRT не инициализирован.")
-        scr.Send(f"{ifaceGpon} {self.frame}/{self.slot}\r")
+        scr.Send(f"interface gpon {self.frame}/{self.slot}\r")
         self.sn = serial
 
 if __name__ == "builtins":

@@ -1,30 +1,50 @@
 # $language = "Python"
 # $interface = "1.0"
 
-# =====================================================================
+# ========================================================================
 # для выполнения диагностики и помещения результата в буфер обмена 
 # необходимо выделить мышкой значение серийного номера, лицевого счёта 
 # или ONT, например, значение "485754430068409E", "102147" или "0/ 0/0 2"
-# =====================================================================
-#
+# ========================================================================
+# Поддержка аргументов (использование данного скрипта для разных 
+# кнопок SecureCRT с разными функциями)
+#  -n: полная диагностика без перезапуска LAN-портов
+#  -o: только проверка оптики (не готово)
+#  -r: только проверка register-info (не готово)
+#  -d: удаление терминала (не готово)
+# ========================================================================
 # TODO:
-# проверка массовости
-# парсинг результата ping 
-# собщение об ошибках LAN портов
-# =====================================================================
+# - проверка массовости
+# - парсинг результата ping 
+# - Eсли терминал недоступен, но не известна причина недоступности, то 
+#   добавить сообщение "Если на терминале индикация LOS, то согласовать 
+#   выезд для проверки линии."
+# - фиксация аптайма терминала
+# - фиксация загрузки и температуры CPU
+# - 
+# ========================================================================
 
 import os
 import re
 import sys
 import time
 import traceback
-
+import argparse
 import pyperclip
 
 # Путь к скрипту и импорт команд
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(script_dir)
-from GPON_class import COMMANDS
+from GPON_class import COMMANDS 
+
+parser = argparse.ArgumentParser(add_help=False)
+parser.add_argument(
+    "-n",
+    "--no-actions",
+    action="store_true",
+    help="Не выполнять сброс ошибок и отключение LAN портов",
+)
+ARGS, _ = parser.parse_known_args()
 
 crt.Screen.Synchronous = True
 
@@ -88,16 +108,22 @@ parsed_data = {
 
 def send_command(command: str, delay: float = 0.1) -> str:
     """Отправка команды на OLT и возврат полного вывода."""
-    crt.Screen.Send(command + "\r \r")
+    crt.Screen.Send(command + "\r")
     time.sleep(0.2)
 
     if "display ont info" in command and "by-desc" not in command:
         crt.Screen.Send("q")
         time.sleep(delay)
-    elif "optical-info" in command or "ont-eth" in command:
+    elif "optical-info" in command:
         crt.Screen.Send(" ")
         time.sleep(delay)
-
+    elif "port state" in command:
+        crt.Screen.Send("\r")
+        time.sleep(delay)
+    elif "remote-ping" in command:
+        crt.Screen.Send("\r")
+    elif "ont-port" in command:
+        crt.Screen.Send("  ")
     return read_output()
 
 
@@ -202,8 +228,7 @@ def diagnose_optics(frame, slot, port, ont, clipboard_data: str) -> str:
     """Диагностика оптики (уровни сигналов + BIP-ошибки)."""
     # Оптическая информация
     output_optical_info = send_command(
-        COMMANDS["optical_info"].format(port=port, ont=ont), 1
-    )
+        COMMANDS["optical_info"].format(port=port, ont=ont), .5)
 
     ont_rx = parse_output(output_optical_info, PATTERNS["ont_rx_power"], str)
     olt_rx = parse_output(output_optical_info, PATTERNS["olt_rx_power"], str)
@@ -298,16 +323,17 @@ def diagnose_lan_and_eth(port, ont, clipboard_data: str) -> str:
         )
 
         # Перезапуск порта
-        send_command(
-            COMMANDS["port_switch"].format(
-                port=port, ont=ont, lan_id=lan_id, state="off"
-            )
-        )
-        send_command(
-            COMMANDS["port_switch"].format(
-                port=port, ont=ont, lan_id=lan_id, state="on"
-            )
-        )
+        # if not ARGS:
+        #     send_command(
+        #         COMMANDS["port_switch"].format(
+        #             port=port, ont=ont, lan_id=lan_id, state="off"
+        #         )
+        #     )
+        #     send_command(
+        #         COMMANDS["port_switch"].format(
+        #             port=port, ont=ont, lan_id=lan_id, state="on"
+        #         )
+        #     )
 
         # Ошибки Ethernet
         output_eth_errors = send_command(
@@ -455,6 +481,9 @@ def handle_online(frame, slot, port, ont, clipboard_data: str) -> str:
         send_command(f"display ont ipconfig {port} {ont}")
         send_command(f"ont remote-ping {port} {ont} ip-address 1.1.1.1")
 
+    # Вывод логов о состояниях терминала
+    send_command(COMMANDS['register_info'].format(port=port, ont=ont))
+
     # Выход из interface gpon
     send_command("quit")
 
@@ -464,6 +493,8 @@ def handle_online(frame, slot, port, ont, clipboard_data: str) -> str:
     # Итог по проблемам
     if not parsed_data["troubleshooting"]:
         clipboard_data += "\nНарушений не выявлено."
+    elif "Необходима" in parsed_data['troubleshooting']:
+        clipboard_data += f"\n{parsed_data['troubleshooting']}"
     else:
         clipboard_data += f"\n{parsed_data['troubleshooting']}Нарушений оптики нет."
 
@@ -550,6 +581,5 @@ def main() -> None:
         msg = f"Ошибка в строке № {error_line}:\n{e}"
         crt.Dialog.MessageBox(msg)
         crt.Screen.Send("display ont info ")
-
 
 main()

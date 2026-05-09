@@ -50,7 +50,6 @@ def main() -> None:
             
             if result == 1:  # Success
                 status = False
-                crt.Dialog.MessageBox("Конфигурация успешно загружена!")
             elif result == 2:  # Fail
                 status = False
                 crt.Dialog.MessageBox("Ошибка загрузки конфигурации!")
