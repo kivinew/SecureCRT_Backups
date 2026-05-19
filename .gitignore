@@ -1,4 +1,54 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing
+.pytest_cache/
+.tox/
+.nox/
+*.cover
+.coverage
+.coverage.*
+htmlcov/
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# Type checker / linters
+.dmypy.json
+
+# --- Environment / secrets ---
+.env
+.env.*
+*.env
+secrets*.json
+config*.json
+
+# --- IDE/editor ---
+.vscode/
+.idea/
+.DS_Store
+
+# --- Your project-specific ignores (kept) ---
 kivinew.vbs
 ASR_login.vbs
 GePON_Login.vbs
+
+# (Existing rule kept)
 *.json
+
