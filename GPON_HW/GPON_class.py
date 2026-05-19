@@ -1,106 +1,357 @@
 # $language = "Python3"
 # $interface = "1.0"
 
+import re
 import pyperclip
 
-# Глобальная ссылка на объект crt (инициализируется из основного скрипта)
+crt = None
+
+
 def inject_crt(obj):
-    """Инъекция SecureCRT-объекта crt. Вызывать обязательно из основного скрипта после импорта этого модуля."""
     global crt
     crt = obj
 
-# Текстовые константы
-pressQ = "( Press 'Q' to break ) ----"
-ont_info = "display ont info" # информация об ONT
-optic = "display ont optical-info" 
-servicePorts = "display current-configuration ont " # конфигурация ont
-undoServPort = "undo service-port port"
-ont_delete = "ont delete "
 
-# команды головной станции Huawei
 COMMANDS = {
-    'ont_info': "display ont info {frame} {slot} {port} {ont}",
-    'info_by_serial': "display ont info by-sn {serial}",
-    'info_by_description': "display ont info by-desc {description}",
-    'ont_version': "display ont version {frame} {slot} {port} {ont}",
-    'optical_info': "display ont optical-info {port} {ont}",
-    'ont_line_quality': "{command} statistics ont-line-quality {port} {ont}",
-    'eth_ports': "display ont port state {port} {ont} eth-port all",
-    'eth_errors': "{command} statistics ont-eth {port} {ont} ont-port {lan_id}",
-    'port_switch': "ont port attribute {port} {ont} eth {lan_id} operational-state {state}",
-    'remote_ping': "ont remote-ping {port} {ont} ip-address {ip}",
-    'pressQ': "( Press 'Q' to break ) ----",
+    "ont_info":
+        "display ont info {frame} {slot} {port} {ont}",
 
+    "ont_version":
+        "display ont version {frame} {slot} {port} {ont}",
+
+    "optical_info":
+        "display ont optical-info {port} {ont}",
+
+    "eth_ports":
+        "display ont port state {port} {ont} eth-port all",
+
+    "eth_errors":
+        "{command} statistics ont-eth "
+        "{port} {ont} ont-port {lan_id}"
 }
 
+
+PATTERNS = {
+
+    "status":
+        r"Run state\s+:\s+(\w+)",
+
+    "serial":
+        r"SN\s+:\s+(\S+)",
+
+    "description":
+        r"Description\s+:\s+(.+)",
+
+    "distance":
+        r"ONT distance\(m\)\s+:\s+(\d+)",
+
+    "uptime":
+        r"Last up time\s+:\s+(.+)",
+
+    "downtime":
+        r"Last down time\s+:\s+(.+)",
+
+    "downcause":
+        r"Last down cause\s+:\s+(.+)",
+
+    "ont_model":
+        r"ONT Type\s+:\s+(.+)",
+
+    "soft_version":
+        r"Main Software Version\s+:\s+(.+)",
+
+    "ont_rx_power":
+        r"Rx optical power\(dBm\)\s+:\s+(-?\d+\.\d+)",
+
+    "olt_rx_power":
+        r"OLT Rx ONT optical power\(dBm\)"
+        r"\s+:\s+(-?\d+\.\d+)"
+}
+
+
 class Ont:
-    def __init__(self, ontSelect:list=[]):
-        """Инициализация объекта ONT из списка параметров (frame, slot, port, ont)."""
-        memBuffer = pyperclip.paste()
-        ontSelect = memBuffer.replace('/', ' ').split()
-        if ontSelect is None or len(ontSelect) < 4:
-            raise ValueError("Некорректное содержимое буфера")
-        self.frame = ontSelect[0]
-        self.slot = ontSelect[1]
-        self.port = ontSelect[2]
-        self.ont = ontSelect[3]
-        self.sn = ontSelect[4] if len(ontSelect) > 4 else ""
 
-    def delete_ont(self) -> None:
-        """
-        Удаление сервисных портов и самой ONT.
-        Показывает сообщения об ошибках пользователю.
-        """
+    def __init__(self, ont_select=None):
+
+        if ont_select is None:
+
+            buffer = pyperclip.paste()
+
+            ont_select = (
+                buffer
+                .replace("/", " ")
+                .split()
+            )
+
+        if len(ont_select) < 4:
+
+            raise ValueError(
+                "Некорректный формат буфера"
+            )
+
+        self.frame = ont_select[0]
+        self.slot = ont_select[1]
+        self.port = ont_select[2]
+        self.ont = ont_select[3]
+
+        self.sn = (
+            ont_select[4]
+            if len(ont_select) > 4
+            else ""
+        )
+
+
+class GPON:
+
+    def __init__(self, ont):
+
+        self.ont = ont
+
+        self.data = {
+
+            "status": "unknown",
+            "serial": "",
+            "description": "",
+            "model": "",
+            "version": "",
+
+            "distance": "",
+
+            "uptime": "",
+            "downtime": "",
+            "downcause": "",
+
+            "ont_rx_power": "",
+            "olt_rx_power": "",
+
+            "troubleshooting": ""
+        }
+
+    def send(self, command):
+
         scr = crt.Screen
-        if crt is None:
-            raise RuntimeError("CRT не инициализирован.")
-        try:
-            scr.Send(f"{undoServPort} {self.frame}/{self.slot}/{self.port} ont {self.ont}\r")
-            scr.WaitForString("gemport", 5)
-            scr.Send("\r")
-            scr.WaitForString("(y/n)", 5)
-            scr.Send("y\r")
-            scr.Send(f"interface gpon {self.frame}/{self.slot}\r")
-            scr.Send(f"{ont_delete} {self.port} {self.ont}\r")
-            scr.Send("q\r")
-        except Exception as e:
-            crt.Dialog.MessageBox(f"Ошибка при удалении ONT: {e}")
 
-    def get_optic(self) -> None:
-        """Получает уровень оптики"""
-        scr = crt.Screen
-        if crt is None:
-            raise RuntimeError("CRT не инициализирован.")
-        scr.Send(f"interface gpon {self.frame}/{self.slot}\r")
-        scr.Send(COMMANDS['optical_info'].format(port=self.port, ont=self.ont))
-        scr.Send("\r quit\r")
+        scr.Send(command + "\r")
 
-    def get_info(self) -> None:
-        """Получает информацию об ONT."""
-        if crt is None:
-            raise RuntimeError("CRT не инициализирован.")
-        try:
-            crt.Screen.Send(f"{ont_info} {self.frame} {self.slot} {self.port} {self.ont}\rq")
-        except Exception as e:
-            crt.Dialog.MessageBox(f"Ошибка при получении данных ONT: {e}")
+        output = ""
 
-    def set_serial(self, serial: str) -> None:
-        """Устанавливает серийный номер ONT."""
-        scr = crt.Screen
-        if crt is None:
-            raise RuntimeError("CRT не инициализирован.")
-        scr.Send(f"interface gpon {self.frame}/{self.slot}\r")
-        self.sn = serial
+        while True:
 
-if __name__ == "builtins":
-    try:
-        memBuffer = pyperclip.paste()
-        ontSelect = memBuffer.replace('/', ' ').split()
-        ont = Ont(ontSelect)
-        ont.get_info()
-    except pyperclip.PyperclipException as e:
-        crt.Dialog.MessageBox(f"Ошибка чтения буфера обмена:\r{e}")
-    except ValueError as e:
-        crt.Dialog.MessageBox(f"Ошибка при получении данных об ONT: {e}")
-    except Exception as e:
-        crt.Dialog.MessageBox(f"Ошибка при выполнении:\r{e}")
+            result = scr.ReadString(
+                ["---- More ----", "#"],
+                2
+            )
+
+            output += result
+
+            if "---- More ----" in result:
+
+                scr.Send(" ")
+
+            elif "#" in result:
+
+                break
+
+        return output
+
+    def parse(self, output, pattern):
+
+        match = re.search(
+            pattern,
+            output
+        )
+
+        if match:
+
+            return match.group(1).strip()
+
+        return None
+
+    def get_ont_info(self):
+
+        cmd = COMMANDS["ont_info"].format(
+            frame=self.ont.frame,
+            slot=self.ont.slot,
+            port=self.ont.port,
+            ont=self.ont.ont
+        )
+
+        output = self.send(cmd)
+
+        fields = [
+
+            "status",
+            "serial",
+            "description",
+            "distance",
+            "uptime",
+            "downtime",
+            "downcause"
+        ]
+
+        for field in fields:
+
+            value = self.parse(
+                output,
+                PATTERNS[field]
+            )
+
+            if value:
+
+                self.data[field] = value
+
+    def get_version(self):
+
+        cmd = COMMANDS["ont_version"].format(
+            frame=self.ont.frame,
+            slot=self.ont.slot,
+            port=self.ont.port,
+            ont=self.ont.ont
+        )
+
+        output = self.send(cmd)
+
+        model = self.parse(
+            output,
+            PATTERNS["ont_model"]
+        )
+
+        version = self.parse(
+            output,
+            PATTERNS["soft_version"]
+        )
+
+        if model:
+            self.data["model"] = model
+
+        if version:
+            self.data["version"] = version
+
+    def diagnose_optics(self):
+
+        crt.Screen.Send(
+            f"interface gpon "
+            f"{self.ont.frame}/"
+            f"{self.ont.slot}\r"
+        )
+
+        cmd = COMMANDS[
+            "optical_info"
+        ].format(
+            port=self.ont.port,
+            ont=self.ont.ont
+        )
+
+        output = self.send(cmd)
+
+        ont_rx = self.parse(
+            output,
+            PATTERNS["ont_rx_power"]
+        )
+
+        olt_rx = self.parse(
+            output,
+            PATTERNS["olt_rx_power"]
+        )
+
+        self.data["ont_rx_power"] = ont_rx
+        self.data["olt_rx_power"] = olt_rx
+
+        if ont_rx:
+
+            power = float(ont_rx)
+
+            if power < -26:
+
+                self.data[
+                    "troubleshooting"
+                ] += (
+                    "Низкий уровень "
+                    "оптики ONT\n"
+                )
+
+    def diagnose_lan(self):
+
+        cmd = COMMANDS[
+            "eth_ports"
+        ].format(
+            port=self.ont.port,
+            ont=self.ont.ont
+        )
+
+        output = self.send(cmd)
+
+        if "up" not in output:
+
+            self.data[
+                "troubleshooting"
+            ] += (
+                "Нет активных "
+                "LAN портов\n"
+            )
+
+    def online_report(self):
+
+        return f"""
+ONT:
+{self.ont.frame}/{self.ont.slot}/{self.ont.port}/{self.ont.ont}
+
+SN:
+{self.data["serial"]}
+
+Описание:
+{self.data["description"]}
+
+Модель:
+{self.data["model"]}
+
+Прошивка:
+{self.data["version"]}
+
+Дистанция:
+{self.data["distance"]}
+
+RX ONT:
+{self.data["ont_rx_power"]}
+
+RX OLT:
+{self.data["olt_rx_power"]}
+
+Диагностика:
+
+{self.data["troubleshooting"]}
+"""
+
+    def offline_report(self):
+
+        return f"""
+ONT OFFLINE
+
+Последнее отключение:
+
+{self.data["downtime"]}
+
+Причина:
+
+{self.data["downcause"]}
+"""
+
+    def diagnose(self):
+
+        self.get_ont_info()
+
+        if (
+            self.data["status"]
+            .lower()
+            != "online"
+        ):
+
+            return self.offline_report()
+
+        self.get_version()
+
+        self.diagnose_optics()
+
+        self.diagnose_lan()
+
+        return self.online_report()
