@@ -4,7 +4,7 @@
 import re
 import pyperclip
 
-crt = None
+# crt = None
 
 
 def inject_crt(obj):
@@ -138,15 +138,16 @@ class GPON:
         while True:
 
             result = scr.ReadString(
-                ["---- More ----", "#"],
-                2
+                ["Press 'Q'", "#"],
+                1
             )
 
             output += result
 
-            if "---- More ----" in result:
+            if "Press 'Q'" in result:
 
-                scr.Send(" ")
+                scr.Send("q")
+                break
 
             elif "#" in result:
 
@@ -355,3 +356,9 @@ ONT OFFLINE
         self.diagnose_lan()
 
         return self.online_report()
+
+if __name__ == "builtins":
+    ont = Ont()
+    gpon = GPON(ont)
+    report = gpon.diagnose()
+    print(report)
