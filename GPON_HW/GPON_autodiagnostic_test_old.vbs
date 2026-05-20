@@ -24,7 +24,7 @@ import pyperclip
 # Путь к скрипту и импорт команд
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(script_dir)
-from GPON_class import COMMANDS
+from GPON_class_old import COMMANDS
 
 crt.Screen.Synchronous = True
 

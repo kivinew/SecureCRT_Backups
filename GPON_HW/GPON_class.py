@@ -4,18 +4,25 @@
 import re
 import pyperclip
 
-# Константы, использующиеся в старом классе GPON_class_old
-undoServPort = "undo service-port port"
+crt = None
+
+PRESS_Q = "---- More ( Press 'Q' to break ) ----"
+PROMPT = "#"
+
 ifaceGpon = "interface gpon "
+undoServPort = "undo service-port port"
 ont_delete = "ont delete "
 
 
 def inject_crt(obj):
+
     global crt
+
     crt = obj
 
 
 COMMANDS = {
+
     "ont_info":
         "display ont info {frame} {slot} {port} {ont}",
 
@@ -29,50 +36,52 @@ COMMANDS = {
         "display ont port state {port} {ont} eth-port all",
 
     "eth_errors":
-        "{command} statistics ont-eth {port} {ont} ont-port {lan_id}",
+        "{command} statistics ont-eth "
+        "{port} {ont} ont-port {lan_id}",
 
-    # Additional commands used by old diagnostics
-    "ont_line_quality": "{command} statistics ont-line-quality {port} {ont}",
-    "port_switch": "ont port attribute {port} {ont} eth {lan_id} operational-state {state}",
-    "remote_ping": "ont remote-ping {port} {ont} ip-address {ip}"
+    "find_by_serial":
+        "display ont info by-sn {serial}",
+
+    "find_by_description":
+        "display ont info by-desc {description}"
 }
 
 
 PATTERNS = {
 
     "status":
-        r"Run state\s+:\s+(\w+)",
+        r"Run state\s*:\s*(.+)",
 
     "serial":
-        r"SN\s+:\s+(\S+)",
+        r"SN\s*:\s*(\S+)",
 
     "description":
-        r"Description\s+:\s+(.+)",
+        r"Description\s*:\s*(.+)",
 
     "distance":
-        r"ONT distance\(m\)\s+:\s+(\d+)",
+        r"ONT distance\(m\)\s*:\s*(\d+)",
 
     "uptime":
-        r"Last up time\s+:\s+(.+)",
+        r"Last up time\s*:\s*(.+)",
 
     "downtime":
-        r"Last down time\s+:\s+(.+)",
+        r"Last down time\s*:\s*(.+)",
 
     "downcause":
-        r"Last down cause\s+:\s+(.+)",
+        r"Last down cause\s*:\s*(.+)",
 
     "ont_model":
-        r"ONT Type\s+:\s+(.+)",
+        r"ONT Type\s*:\s*(.+)",
 
     "soft_version":
-        r"Main Software Version\s+:\s+(.+)",
+        r"Main Software Version\s*:\s*(.+)",
 
     "ont_rx_power":
-        r"Rx optical power\(dBm\)\s+:\s+(-?\d+\.\d+)",
+        r"Rx optical power\(dBm\)\s*:\s*(-?\d+\.\d+)",
 
     "olt_rx_power":
         r"OLT Rx ONT optical power\(dBm\)"
-        r"\s+:\s+(-?\d+\.\d+)"
+        r"\s*:\s*(-?\d+\.\d+)"
 }
 
 
@@ -93,7 +102,7 @@ class Ont:
         if len(ont_select) < 4:
 
             raise ValueError(
-                "Некорректный формат буфера"
+                "Неверный формат GPON адреса"
             )
 
         self.frame = ont_select[0]
@@ -107,196 +116,503 @@ class Ont:
             else ""
         )
 
-    # ---------------------------------------------------------------------
-    # Методы, перенесённые из GPON_class_old для совместимости
-    # ---------------------------------------------------------------------
-    def delete_ont(self) -> None:
-        """Удаление сервисных портов и самой ONT."""
-        scr = crt.Screen
-        if crt is None:
-            raise RuntimeError("CRT не инициализирован.")
-        try:
-            # Удаляем сервис‑порт
-            scr.Send(f"{undoServPort} {self.frame}/{self.slot}/{self.port} ont {self.ont}\r")
-            scr.WaitForString("gemport", 5)
-            scr.Send("\r")
-            scr.WaitForString("(y/n)", 5)
-            scr.Send("y\r")
-            # Переходим в интерфейс GPON
-            scr.Send(f"{ifaceGpon} {self.frame}/{self.slot}\r")
-            # Удаляем ONT
-            scr.Send(f"{ont_delete} {self.port} {self.ont}\r")
-            scr.Send("q\r")
-        except Exception as e:
-            crt.Dialog.MessageBox(f"Ошибка при удалении ONT: {e}")
+    @classmethod
+    def from_address(cls, address):
 
-    def get_optic(self) -> None:
-        """Получает уровень оптики ONT."""
-        scr = crt.Screen
-        if crt is None:
-            raise RuntimeError("CRT не инициализирован.")
-        scr.Send(f"{ifaceGpon} {self.frame}/{self.slot}\r")
-        scr.Send(f"display ont optical-info {self.port} {self.ont}\r")
-        scr.Send(" quit\r")
+        parsed = (
+            address
+            .replace("/", " ")
+            .split()
+        )
 
-    def get_info(self) -> str:
-        """Получает информацию об ONT (display ont info) с поддержкой постраничного вывода.
+        return cls(parsed)
 
-        Возвращает полный вывод команды как строку.
-        """
-        if crt is None:
-            raise RuntimeError("CRT не инициализирован.")
-        scr = crt.Screen
-        command = f"display ont info {self.frame} {self.slot} {self.port} {self.ont}"
-        scr.Send(command + "\r")
-        output = ""
-        while True:
-            # Ожидаем либо окончание вывода (prompt "#"), либо сообщение о постраничном выводе "More",
-            # либо возможность прервать "Press 'Q'".
-            result = scr.ReadString(["Press 'Q'", "#", "More"], 1)
-            output += result
-            if "More" in result:
-                # Пробел обычно продолжает вывод в SecureCRT
-                scr.Send(" ")
-                continue
-            if "Press 'Q'" in result:
-                scr.Send("q")
-                break
-            if "#" in result:
-                break
-        return output
+    def delete_ont(self):
 
-    def set_serial(self, serial: str) -> None:
-        """Устанавливает серийный номер ONT (используется в старом коде)."""
         scr = crt.Screen
-        if crt is None:
-            raise RuntimeError("CRT не инициализирован.")
-        scr.Send(f"{ifaceGpon} {self.frame}/{self.slot}\r")
-        self.sn = serial
+
+        scr.Send(
+            f"{undoServPort} "
+            f"{self.frame}/"
+            f"{self.slot}/"
+            f"{self.port} "
+            f"ont "
+            f"{self.ont}\r"
+        )
+
+        scr.WaitForString(
+            "gemport",
+            5
+        )
+
+        scr.Send("\r")
+
+        scr.WaitForString(
+            "(y/n)",
+            5
+        )
+
+        scr.Send("y\r")
+
+        scr.Send(
+            f"{ifaceGpon}"
+            f"{self.frame}/"
+            f"{self.slot}\r"
+        )
+
+        scr.Send(
+            f"{ont_delete} "
+            f"{self.port} "
+            f"{self.ont}\r"
+        )
+
+        scr.Send(
+            "quit\r"
+        )
 
 
 class GPON:
 
-    def __init__(self, ont):
+    def __init__(self, ont=None):
 
         self.ont = ont
 
         self.data = {
 
-            "status": "unknown",
+            "status": "",
+
             "serial": "",
+
             "description": "",
+
             "model": "",
+
             "version": "",
 
             "distance": "",
 
             "uptime": "",
+
             "downtime": "",
+
             "downcause": "",
 
             "ont_rx_power": "",
+
             "olt_rx_power": "",
 
             "troubleshooting": ""
         }
 
-    def send(self, command):
+    def _wait_prompt(self):
 
+        """Ждём настоящий prompt, игнорируя # внутри данных."""
+
+        scr = crt.Screen
+
+        while True:
+
+            idx = scr.WaitForString(
+                "#",
+                5
+            )
+
+            if idx == 0:
+
+                continue
+
+            cur = scr.CurrentRow
+
+            try:
+
+                line = scr.Get(
+                    cur,
+                    1,
+                    cur,
+                    200
+                ).strip()
+
+                if line.endswith("#"):
+
+                    return
+
+            except:
+
+                pass
+
+    def send(self, command, max_more=0):
+
+        """Отправка команды и сбор вывода с обработкой пагинации.
+
+        max_more:
+            -1 — листать до конца (пробелы)
+            0  — сразу q (первая страница)
+            N  — N пробелов, затем q
+        """
         scr = crt.Screen
 
         scr.Send(command + "\r")
 
         output = ""
+        more_count = 0
 
         while True:
-            # Читаем строку, ожидая либо окончание вывода (prompt "#"),
-            # либо сообщение о постраничном выводе "More".
-            result = scr.ReadString(
-                ["Press 'Q'", "#", "More"],
-                1
+
+            row_before = scr.CurrentRow
+
+            index = scr.WaitForStrings(
+                [
+                    "---- More ( Press 'Q' to break ) ----",
+                    "#"
+                ],
+                5
             )
 
-            output += result
+            if index == 0:
 
-            # Если встретилось сообщение о постраничном выводе, отправляем пробел
-            # (обычно в SecureCRT это продолжает вывод) и продолжаем цикл.
-            if "More" in result:
-                # Некоторые устройства требуют именно пробел, иногда – Enter.
-                scr.Send(" ")
-                continue
+                for r in range(
+                    row_before,
+                    scr.CurrentRow + 1
+                ):
 
-            # Обычное завершение – пользователь может прервать нажатием Q.
-            if "Press 'Q'" in result:
+                    line = scr.Get(
+                        r,
+                        1,
+                        r,
+                        200
+                    ).strip()
+
+                    if line:
+
+                        output += line + "\n"
+
+                break
+
+            for r in range(
+                row_before,
+                scr.CurrentRow + 1
+            ):
+
+                line = scr.Get(
+                    r,
+                    1,
+                    r,
+                    200
+                ).strip()
+
+                if line:
+
+                    output += line + "\n"
+
+            if index == 1:
+
+                if max_more == -1:
+
+                    scr.Send(" ")
+
+                    continue
+
+                if more_count < max_more:
+
+                    scr.Send(" ")
+
+                    more_count += 1
+
+                    continue
+
                 scr.Send("q")
+
+                self._wait_prompt()
+
                 break
 
-            # Достигнут обычный командный промпт.
-            if "#" in result:
-                break
+            if index == 2:
+
+                if self._is_real_prompt():
+
+                    break
+
+                continue
 
         return output
 
-    # ---------------------------------------------------------------------
-    # Внутренние методы диагностики (перенесены из старого скрипта)
-    # ---------------------------------------------------------------------
-    def parse(self, output, pattern):
-        match = re.search(pattern, output)
-        return match.group(1).strip() if match else None
+    def _is_real_prompt(self):
+
+        """Текущая строка заканчивается на # — значит это prompt."""
+
+        try:
+
+            line = crt.Screen.Get(
+                crt.Screen.CurrentRow,
+                1,
+                crt.Screen.CurrentRow,
+                200
+            ).strip()
+
+            return line.endswith("#")
+
+        except:
+
+            return False
+
+    def parse(
+        self,
+        output,
+        pattern
+    ):
+
+        match = re.search(
+            pattern,
+            output
+        )
+
+        if match:
+
+            return (
+                match
+                .group(1)
+                .strip()
+            )
+
+        return None
+
+    def parse_ont(
+        self,
+        output
+    ):
+
+        match = re.search(
+
+            r"(\d+)/(\d+)/(\d+)\s+(\d+)",
+
+            output
+        )
+
+        if not match:
+
+            return None
+
+        return Ont([
+
+            match.group(1),
+
+            match.group(2),
+
+            match.group(3),
+
+            match.group(4)
+        ])
+
+    def find_by_serial(
+        self,
+        serial
+    ):
+
+        cmd = COMMANDS[
+            "find_by_serial"
+        ].format(
+            serial=serial
+        )
+
+        output = self.send(
+            cmd,
+            max_more=0
+        )
+
+        return self.parse_ont(
+            output
+        )
+
+    def find_by_description(
+        self,
+        description
+    ):
+
+        cmd = COMMANDS[
+            "find_by_description"
+        ].format(
+            description=description
+        )
+
+        output = self.send(
+            cmd,
+            max_more=0
+        )
+
+        return self.parse_ont(
+            output
+        )
 
     def get_ont_info(self):
-        cmd = COMMANDS["ont_info"].format(
+
+        cmd = COMMANDS[
+            "ont_info"
+        ].format(
+
             frame=self.ont.frame,
+
             slot=self.ont.slot,
+
             port=self.ont.port,
-            ont=self.ont.ont,
+
+            ont=self.ont.ont
         )
-        output = self.send(cmd)
-        for field in ["status", "serial", "description", "distance", "uptime", "downtime", "downcause"]:
-            value = self.parse(output, PATTERNS[field])
+
+        output = self.send(
+            cmd,
+            max_more=1
+        )
+
+        fields = [
+
+            "status",
+
+            "serial",
+
+            "description",
+
+            "distance",
+
+            "uptime",
+
+            "downtime",
+
+            "downcause"
+        ]
+
+        for field in fields:
+
+            value = self.parse(
+                output,
+                PATTERNS[field]
+            )
+
             if value:
-                self.data[field] = value
+
+                self.data[
+                    field
+                ] = value
 
     def get_version(self):
-        cmd = COMMANDS["ont_version"].format(
-            frame=self.ont.frame,
-            slot=self.ont.slot,
-            port=self.ont.port,
-            ont=self.ont.ont,
-        )
-        output = self.send(cmd)
-        model = self.parse(output, PATTERNS["ont_model"])
-        version = self.parse(output, PATTERNS["soft_version"])
-        if model:
-            self.data["model"] = model
-        if version:
-            self.data["version"] = version
 
-    def diagnose_optics(self):
-        crt.Screen.Send(
-            f"interface gpon {self.ont.frame}/{self.ont.slot}\r"
+        cmd = COMMANDS[
+            "ont_version"
+        ].format(
+
+            frame=self.ont.frame,
+
+            slot=self.ont.slot,
+
+            port=self.ont.port,
+
+            ont=self.ont.ont
         )
-        cmd = COMMANDS["optical_info"].format(port=self.ont.port, ont=self.ont.ont)
-        output = self.send(cmd)
-        ont_rx = self.parse(output, PATTERNS["ont_rx_power"])
-        olt_rx = self.parse(output, PATTERNS["olt_rx_power"])
-        self.data["ont_rx_power"] = ont_rx
-        self.data["olt_rx_power"] = olt_rx
+
+        scr = crt.Screen
+
+        scr.Send(
+            cmd + "\r"
+        )
+
+        self._wait_prompt()
+
+    def diagnose_online(self):
+
+        scr = crt.Screen
+
+        # Вход в interface gpon
+        scr.Send(
+            f"interface gpon "
+            f"{self.ont.frame}/"
+            f"{self.ont.slot}\r"
+        )
+
+        self._wait_prompt()
+
+        # Оптика — листать до конца
+        out_optics = self.send(
+            COMMANDS["optical_info"].format(
+                port=self.ont.port,
+                ont=self.ont.ont
+            ),
+            max_more=-1
+        )
+
+        # LAN — листать до конца
+        out_lan = self.send(
+            COMMANDS["eth_ports"].format(
+                port=self.ont.port,
+                ont=self.ont.ont
+            ),
+            max_more=-1
+        )
+
+        # Выход из interface gpon
+        scr.Send("quit\r")
+
+        self._wait_prompt()
+
+        ont_rx = self.parse(
+            out_optics,
+            PATTERNS["ont_rx_power"]
+        )
+
+        olt_rx = self.parse(
+            out_optics,
+            PATTERNS["olt_rx_power"]
+        )
+
+        self.data["ont_rx_power"] = ont_rx or ""
+        self.data["olt_rx_power"] = olt_rx or ""
+
         if ont_rx:
+
             try:
+
                 power = float(ont_rx)
+
                 if power < -26:
-                    self.data["troubleshooting"] += "Низкий уровень оптики ONT\n"
-            except ValueError:
+
+                    self.data[
+                        "troubleshooting"
+                    ] += "Низкий уровень оптики\n"
+
+            except:
+
                 pass
 
-    def diagnose_lan(self):
-        cmd = COMMANDS["eth_ports"].format(port=self.ont.port, ont=self.ont.ont)
-        output = self.send(cmd)
-        if "up" not in output:
-            self.data["troubleshooting"] += "Нет активных LAN портов\n"
+        if "up" not in out_lan:
+
+            self.data[
+                "troubleshooting"
+            ] += "Нет активных LAN портов\n"
+
+    def diagnose(self):
+
+        self.get_ont_info()
+
+        if (
+
+            "online"
+
+            not in
+
+            self.data[
+                "status"
+            ].lower()
+
+        ):
+
+            return self.offline_report()
+
+        self.get_version()
+
+        self.diagnose_online()
+
+        return self.online_report()
 
     def online_report(self):
+
         return f"""
 ONT:
 {self.ont.frame}/{self.ont.slot}/{self.ont.port}/{self.ont.ont}
@@ -328,6 +644,7 @@ RX OLT:
 """
 
     def offline_report(self):
+
         return f"""
 ONT OFFLINE
 
@@ -339,28 +656,3 @@ ONT OFFLINE
 
 {self.data["downcause"]}
 """
-
-    def diagnose(self):
-        self.get_ont_info()
-        if self.data["status"].lower() != "online":
-            return self.offline_report()
-        self.get_version()
-        self.diagnose_optics()
-        self.diagnose_lan()
-        return self.online_report()
-
-# ---------------------------------------------------------------------
-# Точка входа при запуске из SecureCRT (используется условие "builtins")
-# ---------------------------------------------------------------------
-if __name__ == "builtins":
-    try:
-        memBuffer = pyperclip.paste()
-        ontSelect = memBuffer.replace('/', ' ').split()
-        ont = Ont(ontSelect)
-        ont.get_info()
-    except pyperclip.PyperclipException as e:
-        crt.Dialog.MessageBox(f"Ошибка чтения буфера обмена:\r{e}")
-    except ValueError as e:
-        crt.Dialog.MessageBox(f"Ошибка при получении данных об ONT: {e}")
-    except Exception as e:
-        crt.Dialog.MessageBox(f"Ошибка при выполнении:\r{e}")
