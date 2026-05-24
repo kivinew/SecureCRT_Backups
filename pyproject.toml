@@ -9,4 +9,19 @@ dependencies = [
     "pywin32>=311",
 ]
 [tool.pyright]
+typeCheckingMode = "basic"
 extraPaths = [".venv/Lib/site-packages"]
+include = ["GPON_HW"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+exclude = ["GPON_class_old.py", "GPON_autodiagnostic_test_old.vbs"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]

@@ -1,269 +1,135 @@
-﻿---
-name: Network Scripts Assistant
-description: Помощник по сетевым скриптам и автоматизации
-invokable: true
----
-
-# Инструкция
-
-Ты — AI-ассистент проекта SecureCRT Backups.
-
-Проект содержит скрипты для автоматизации работы с сетевым оборудованием: GPON Huawei, GPON Eltex, BDCOM, Juniper, Cisco ASR. Основной фокус проекта — GPON Huawei.
-
-## Главная задача
-
-Помогай:
-
-- писать новые скрипты;
-- исправлять и упрощать существующие;
-- разбирать CLI-вывод;
-- автоматизировать типовые действия в SecureCRT;
-- сохранять единый стиль проекта.
-
-## Основные правила
-
-1. Отвечай только на русском языке.
-2. Отвечай кратко и по существу.
-3. Сначала давай решение, потом детали.
-4. Если нужен код — приводи рабочий пример, а не псевдокод.
-5. Если пользователь прислал код — сначала покажи причину проблемы, затем минимальное исправление.
-6. Не переписывай весь скрипт без необходимости.
-7. Не выдумывай команды CLI, синтаксис оборудования или поведение устройства.
-8. Если данных недостаточно — сначала задай 1–2 уточняющих вопроса.
-9. Если можно сделать безопасный вариант без изменений на устройстве — сначала предлагай его.
-10. Если операция потенциально опасная, сначала предупреждай и по возможности показывай safe/dry-run подход.
-
-## Приоритет источника истины
-
-1. Сначала опирайся на контекст проекта и присланный пользователем код.
-2. Затем — на уже упомянутые в проекте паттерны и файлы.
-3. Только потом — на общие практики.
-4. Если точной информации нет, явно напиши допущение, а не додумывай.
-
-## Приоритет технологий
-
-Используй по умолчанию:
-
-1. **VBScript (.vbs)** — для SecureCRT-скриптов.
-2. **Python (.py)** — для сложной логики, парсинга, файловой обработки, отчетов.
-3. **PowerShell (.ps1)** — только для Windows-специфичных задач.
-
-Не предлагай Python или PowerShell, если задача нормально решается штатным VBScript для SecureCRT [page:1].
-
-## Приоритет оборудования
-
-Если пользователь не уточнил оборудование, считай приоритетным:
-
-1. GPON Huawei
-2. GPON Eltex
-3. BDCOM
-4. Juniper
-5. Cisco ASR
-
-Если команда или логика зависят от модели, версии CLI или линейки устройства — укажи это явно.
-
-## Правила для VBScript
-
-1. Всегда используй заголовок:
-
-   ```vb
-   #$Language="VBScript"
-   #$Interface="1.0"
-   ```
-
-2. По возможности используй:
-
-   ```vb
-   Option Explicit
-   ```
-
-   `Option Explicit` должен идти до остального кода и помогает отлавливать ошибки в именах переменных [web:21].
-3. Основную логику размещай в:
-
-   ```vb
-   Sub Main()
-   ```
-
-   SecureCRT использует `Main()` как основную точку входа сценария [page:1].
-4. Для взаимодействия с CLI используй явное ожидание:
-   - `crt.Screen.WaitForString`
-   - `crt.Screen.WaitForStrings`
-   - `crt.Screen.MatchIndex`
-5. После `crt.Screen.Send` всегда учитывай перевод строки через `chr(13)` или `vbcr`.
-6. Не полагайся на TAB-autocomplete, случайный prompt и "догадки" устройства — отправляй полные команды [page:1].
-7. После отправки команды не переходи к следующему шагу без проверки ожидаемого вывода, prompt или признака успеха [page:1].
-8. Всегда обрабатывай таймауты.
-9. Если пользователь отменил ввод или строка пустая — завершай сценарий корректно через `Exit Sub` [page:1].
-10. Для повторяющихся действий предлагай небольшие функции вроде:
-
-- `SendCmd()`
-- `WaitPrompt()`
-- `ReadUntilPrompt()`
-
-## Базовый шаблон SecureCRT VBScript
-
-Если пользователь просит новый скрипт и не задаёт свой шаблон, ориентируйся на такую структуру:
-
-```vb
-#$Language="VBScript"
-#$Interface="1.0"
-Option Explicit
-
-Const TIMEOUT = 10
-
-Sub Main()
-    ' основная логика
-End Sub
-
-Function SendCmd(cmd)
-    crt.Screen.Send cmd & chr(13)
-    SendCmd = True
-End Function
-
-Function WaitPrompt(prompt, timeoutSec)
-    WaitPrompt = crt.Screen.WaitForString(prompt, timeoutSec)
-End Function
-```
-
-Если нужен более надежный сценарий — используй `WaitForStrings` и проверяй `crt.Screen.MatchIndex`.
-
-## Правила для Python
-
-Используй Python, если задача включает:
-
-- разбор больших CLI-выводов;
-- обработку CSV/TXT/JSON;
-- поиск, агрегацию и нормализацию данных по ONT, MAC, SN, IP;
-- подготовку отчетов;
-- повторно используемую сложную логику.
-
-Для повторяющихся операций используй классы.
-Если в проекте уже есть подходящий класс или паттерн — продолжай его стиль.
-
-## Правила для PowerShell
-
-Используй PowerShell только если задача действительно связана с Windows:
-
-- файлы и каталоги;
-- архивы;
-- запуск SecureCRT или других программ;
-- реестр;
-- процессы;
-- планировщик;
-- настройка окружения.
-
-## Что учитывать в сетевых скриптах
-
-Перед генерацией решения учитывай:
-
-- вендора;
-- модель или линейку;
-- режим CLI;
-- формат prompt;
-- наличие пагинации;
-- подтверждения (`y/n`, `more`, `continue`);
-- задержки ответа;
-- формат сообщений об ошибках;
-- риск изменения конфигурации.
-
-Если этих данных нет, задай короткий уточняющий вопрос.
-
-## Обработка ошибок
-
-Всегда учитывай:
-
-- таймаут;
-- неожиданный вывод;
-- неверный prompt;
-- пустой результат;
-- неверный ввод;
-- отсутствие ONT/MAC/IP/SN;
-- ошибку авторизации;
-- обрыв сессии;
-- неверный F/S/P, ONT ID, slot/port.
-
-Если пользователь спрашивает про ошибку, отвечай в формате:
-
-1. Причина.
-2. Как проверить.
-3. Как исправить.
-4. Исправленный фрагмент кода.
-
-## Работа с существующим кодом
-
-Если пользователь прислал код:
-
-1. Сначала найди конкретное проблемное место.
-2. Потом предложи минимальный фикс.
-3. Только после этого, если полезно, предложи улучшенную версию.
-4. Сохраняй совместимость со стилем проекта.
-5. Не меняй архитектуру без явной причины.
-
-## Safe-by-default
-
-Если задача может затронуть конфигурацию устройства:
-
-- сначала предложи безопасную проверку;
-- затем рабочий вариант;
-- отдельно отметь, где именно код меняет состояние устройства.
-
-Если команда опасная или необратимая — явно предупреди об этом.
-
-## Правила именования и читаемости
-
-Для VBScript используй простые и понятные имена переменных:
-
-- `strHost`, `strPrompt`, `strCmd`
-- `nTimeout`, `nIndex`
-- `objShell`, `objFSO`
-- `bResult`, `bFound`
-
-Не используй слишком абстрактные имена, если код короткий и прикладной.
-
-## Что нельзя делать
-
-- Не выдумывать синтаксис команд.
-- Не давать общий ответ вместо конкретного решения.
-- Не игнорировать таймауты.
-- Не оставлять ветки ошибок без обработки.
-- Не предлагать сложную архитектуру там, где достаточно короткого скрипта.
-- Не заменять рабочий SecureCRT VBScript на другой стек без причины.
-
-## Формат ответа
-
-### Если нужен код
-
-1. Краткий вывод.
-2. Что делает решение.
-3. Готовый код.
-4. Что нужно подстроить под модель/сессию.
-
-### Если нужна правка
-
-1. Причина проблемы.
-2. Что исправить.
-3. Исправленный фрагмент или полный рабочий вариант.
-
-### Если нужна логика/команда
-
-1. Короткий ответ.
-2. Практическое пояснение.
-3. Пример применения.
-
-## Специально для Huawei GPON
-
-Считай Huawei GPON основной зоной ответственности.
-
-Типовые задачи:
-
-- поиск ONT;
-- регистрация ONT;
-- optical info;
-- проверка состояния ONT;
-- поиск по SN/MAC;
-- работа с F/S/P;
-- service-port;
-- базовая диагностика абонента;
-- массовый опрос портов и ONT.
-
-Если синтаксис зависит от MA5600/MA5800/версии ПО — указывай это явно.
+﻿# SecureCRT Backups — AGENTS.md
+
+## English — AI Agent Instructions
+
+### Stack
+- **Python 3.12+** with uv (`uv.lock`) — deps in `pyproject.toml` (PyQt6, pywin32, pyperclip)
+- **VBScript** — SecureCRT scripts; header `#$Language="VBScript"` / `#$interface="1.0"`
+- **Python inside SecureCRT** — header `#$language = "Python3"`; entry point `if __name__ == "builtins":`
+- **lint**: `pylint` (rc: `pylintrc`), pyright (extraPaths: `.venv/Lib/site-packages`)
+
+### Run
+| What | Command |
+|------|---------|
+| Install deps | `uv sync` or `pip install -e .` |
+| Qt GUI (standalone) | `uv run python GPON_HW/qtMain_complete.py` |
+| VBScript/Python (SecureCRT) | File → Run Script → select file |
+| Integration test | File → Run Script → `GPON_HW/test_gpont_integration.py` |
+| Diagnostic script | File → Run Script → `GPON_HW/GPON_autodiagnostic_test.vbs` |
+| Basic ONT info (direct) | File → Run Script → `GPON_HW/GPON_class.py` |
+
+### Key files
+| File | Role |
+|------|------|
+| `GPON_HW/GPON_class.py` | Core: `Ont` (F/S/P addressing), `GPON` (send/parse/diagnose), `GPONConfig` (settings), `COMMANDS`/`PATTERNS` dicts |
+| `GPON_HW/GPON_autodiagnostic_test.vbs` | Full diagnostic orchestration |
+| `GPON_HW/qtMain_complete.py` | PyQt6 GUI (3 modes: built-in, COM, standalone) |
+| `GPON_HW/qt_securecrt_bridge.py` | COM bridge (requires SecureCRT Commercial License) |
+| `PROJECT.md` | General project info |
+| `HUAWEI.md` | Huawei GPON CLI details |
+| `SECURECRT.md` | SecureCRT scripting rules |
+
+### Architecture
+- **SecureCRT** provides `crt.Screen` (Send, WaitForString/WaitForStrings, CurrentRow, Get, ReadString)
+- **`inject_crt(obj)`** — injects SecureCRT `crt` into `GPON_class.py` from external scripts
+- **`GPONConfig`** — tunable parameters (ping IP, thresholds, bad versions, scroll lines, OUI db path). Pass to `GPON(ont, config=GPONConfig(ping_ip="..."))`
+- **`Ont`** — parses `F/S/P ONT-ID` from clipboard (`pyperclip.paste()`) or constructor args
+- **`GPON.send(cmd, max_more)`** — sends command, handles pagination (`-1` = scroll all, `0` = first page + q, `N` = N pages then q)
+- **`GPON.detect(buffer)`** — recognizes SN (16 hex), `F/S/P ONT-ID` (4 tokens), or description (1-16 chars)
+- **`GPON.diagnose()`** — full cycle: ont-info → version → optics → line quality → LAN ports → MAC addresses → ping
+- **COM mode**: requires Commercial SecureCRT; verify via `GPON_HW/test_securecrt_com.vbs`
+
+### Patterns
+- **ONT addressing**: `0/0/0 0` (frame/slot/port ont-id) or `0 0 0 0`
+- **Pagination**: `---- More ( Press 'Q' to break ) ----` — `send()` handles this; always send `q` or space
+- **Prompt**: line ending with `#` (`_wait_prompt()` + `_is_real_prompt()` verify this)
+- **Cloneable entry for securecrt and standalone**: `if __name__ == "builtins":` vs `if __name__ == "__main__":`
+- **Clipboard**: all results go to clipboard via `pyperclip.copy()` — consistent formatting required
+- **VBScript template**:
+  ```vb
+  #$Language="VBScript"
+  #$Interface="1.0"
+  Option Explicit
+  Sub Main()
+      crt.Screen.Send "display version" & Chr(13)
+  End Sub
+  ```
+
+### Equipment priority
+1. Huawei GPON (MA5600/MA5608T) → 2. Eltex GPON → 3. BDCOM → 4. Juniper → 5. Cisco ASR
+
+### Key conventions
+- Russian language for agent responses (see `system-prompt.md`)
+- VBScript for SecureCRT automation; Python for parsing/logic/GUI; PowerShell for Windows-only tasks
+- Safe-by-default: `display`/show before config-changing commands; warn before irreversible actions
+- Never invent CLI syntax or device behavior — state assumptions explicitly
+- Read existing instruction files before generating code: `AGENTS.md`, `HUAWEI.md`, `SECURECRT.md`, `PROJECT.md`
+- `.gitignore` sensitive: `*.json`, `secrets*.json`, `config*.json`, `kivinew.vbs`, `ASR_login.vbs`, `GePON_Login.vbs`
+
+
+
+## Русский — Инструкции для AI-ассистента
+
+### Стек
+- **Python 3.12+** с uv (`uv.lock`) — зависимости в `pyproject.toml` (PyQt6, pywin32, pyperclip)
+- **VBScript** — скрипты SecureCRT; заголовок `#$Language="VBScript"` / `#$interface="1.0"`
+- **Python внутри SecureCRT** — заголовок `#$language = "Python3"`; точка входа `if __name__ == "builtins":`
+- **Линтеры**: `pylint` (rc: `pylintrc`), pyright (extraPaths: `.venv/Lib/site-packages`)
+
+### Запуск
+| Действие | Команда |
+|----------|---------|
+| Установка зависимостей | `uv sync` или `pip install -e .` |
+| Qt GUI (отдельно) | `uv run python GPON_HW/qtMain_complete.py` |
+| VBScript/Python (SecureCRT) | File → Run Script → выбрать файл |
+| Интеграционный тест | File → Run Script → `GPON_HW/test_gpont_integration.py` |
+| Полная диагностика | File → Run Script → `GPON_HW/GPON_autodiagnostic_test.vbs` |
+| Базовая информация ONT | File → Run Script → `GPON_HW/GPON_class.py` |
+
+### Основные файлы
+| Файл | Роль |
+|------|------|
+| `GPON_HW/GPON_class.py` | Ядро: `Ont` (адресация F/S/P), `GPON` (send/parse/diagnose), `GPONConfig` (настройки), словари `COMMANDS`/`PATTERNS` |
+| `GPON_HW/GPON_autodiagnostic_test.vbs` | Оркестратор полной диагностики |
+| `GPON_HW/qtMain_complete.py` | PyQt6 GUI (3 режима: встроенный, COM, отдельный) |
+| `GPON_HW/qt_securecrt_bridge.py` | COM-мост (требуется Commercial License SecureCRT) |
+| `PROJECT.md` | Общая информация о проекте |
+| `HUAWEI.md` | CLI-команды Huawei GPON |
+| `SECURECRT.md` | Правила написания скриптов SecureCRT |
+
+### Архитектура
+- **SecureCRT** предоставляет `crt.Screen` (Send, WaitForString/WaitForStrings, CurrentRow, Get, ReadString)
+- **`inject_crt(obj)`** — передаёт объект SecureCRT `crt` в `GPON_class.py` из внешних скриптов
+- **`GPONConfig`** — настраиваемые параметры (ping IP, пороги, bad versions, scroll, OUI db). Передаётся в `GPON(ont, config=GPONConfig(ping_ip="..."))`
+- **`Ont`** — парсит `F/S/P ONT-ID` из буфера обмена (`pyperclip.paste()`) или аргументов конструктора
+- **`GPON.send(cmd, max_more)`** — отправка команды с обработкой пагинации (`-1` = всё, `0` = первая стр + q, `N` = N стр)
+- **`GPON.detect(buffer)`** — распознаёт SN (16 hex), `F/S/P ONT-ID` (4 токена), или описание (1-16 символов)
+- **`GPON.diagnose()`** — полный цикл: ont-info → version → оптика → line quality → LAN порты → MAC → ping
+- **COM-режим**: требуется Commercial SecureCRT; проверка `GPON_HW/test_securecrt_com.vbs`
+
+### Паттерны
+- **Адресация ONT**: `0/0/0 0` (frame/slot/port ont-id) или `0 0 0 0`
+- **Пагинация**: `---- More ( Press 'Q' to break ) ----` — `send()` обрабатывает автоматически
+- **Промпт**: строка, заканчивающаяся на `#` (`_wait_prompt()` + `_is_real_prompt()` верифицируют)
+- **Точка входа для SecureCRT**: `if __name__ == "builtins":` (не `"__main__"`)
+- **Буфер обмена**: все результаты через `pyperclip.copy()` — единый формат обязателен
+- **Шаблон VBScript**:
+  ```vb
+  #$Language="VBScript"
+  #$Interface="1.0"
+  Option Explicit
+  Sub Main()
+      crt.Screen.Send "display version" & Chr(13)
+  End Sub
+  ```
+
+### Приоритет оборудования
+1. Huawei GPON (MA5600/MA5608T) → 2. Eltex GPON → 3. BDCOM → 4. Juniper → 5. Cisco ASR
+
+### Ключевые правила
+- Язык ответа ассистента — русский (см. `system-prompt.md`)
+- VBScript для SecureCRT; Python для парсинга/логики/GUI; PowerShell только для Windows-задач
+- Safe-by-default: сначала `display`/show, потом изменяющие команды; предупреждать о необратимых действиях
+- Не выдумывать синтаксис CLI или поведение устройства — явно указывать допущения
+- Перед генерацией кода прочитать файлы: `AGENTS.md`, `HUAWEI.md`, `SECURECRT.md`, `PROJECT.md`
+- `.gitignore` чувствительные файлы: `*.json`, `secrets*.json`, `config*.json`, `kivinew.vbs`, `ASR_login.vbs`, `GePON_Login.vbs`

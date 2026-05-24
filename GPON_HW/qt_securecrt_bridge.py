@@ -14,13 +14,15 @@ SecureCRT Bridge для Qt приложения
         print(output)
 """
 
+from __future__ import annotations
+
 import time
-import sys
+from typing import Any, Dict, List, Optional
 
 try:
-    import win32com.client
-    import pythoncom
-    WIN32_AVAILABLE = True
+    import win32com.client  # type: ignore
+    import pythoncom  # type: ignore
+    WIN32_AVAILABLE: bool = True
 except ImportError:
     WIN32_AVAILABLE = False
     print("WARNING: pywin32 не установлен. Установите через: pip install pywin32")
@@ -29,12 +31,12 @@ except ImportError:
 class SecureCRTBridge:
     """Бридж для взаимодействия с SecureCRT через COM"""
     
-    def __init__(self):
-        self.securecrt = None
-        self.active_session = None
-        self._last_output = ""
+    def __init__(self) -> None:
+        self.securecrt: Any = None
+        self.active_session: Any = None
+        self._last_output: str = ""
         
-    def connect(self, create_new=False):
+    def connect(self, create_new: bool = False) -> bool:
         """
         Подключение к SecureCRT
         
@@ -76,13 +78,13 @@ class SecureCRTBridge:
             print(f"[ERROR] Ошибка подключения: {e}")
             return False
     
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Отключение от SecureCRT"""
         self.active_session = None
         self.securecrt = None
         print("[INFO] Отключено от SecureCRT")
     
-    def get_session(self, session_name=None):
+    def get_session(self, session_name: Optional[str] = None) -> Any:
         """
         Получение объекта сессии
         
@@ -117,7 +119,7 @@ class SecureCRTBridge:
             print(f"[ERROR] Ошибка получения сессии: {e}")
             return None
     
-    def switch_to_session(self, session_name):
+    def switch_to_session(self, session_name: str) -> bool:
         """
         Переключение на указанную сессию
         
@@ -138,7 +140,7 @@ class SecureCRTBridge:
                 return False
         return False
     
-    def send_command(self, command, session_name=None):
+    def send_command(self, command: str, session_name: Optional[str] = None) -> bool:
         """
         Отправка команды в терминал
         
@@ -162,7 +164,7 @@ class SecureCRTBridge:
             print(f"[ERROR] Ошибка отправки команды: {e}")
             return False
     
-    def read_output(self, timeout=10, session_name=None):
+    def read_output(self, timeout: int = 10, session_name: Optional[str] = None) -> str:
         """
         Чтение вывода терминала до промпта
         
@@ -187,7 +189,7 @@ class SecureCRTBridge:
             print(f"[ERROR] Ошибка чтения вывода: {e}")
             return ""
     
-    def wait_for_string(self, patterns, timeout=10, session_name=None):
+    def wait_for_string(self, patterns: Any, timeout: int = 10, session_name: Optional[str] = None) -> int:
         """
         Ожидание одного из паттернов в выводе
         
@@ -217,7 +219,7 @@ class SecureCRTBridge:
             print(f"[ERROR] Ошибка ожидания: {e}")
             return 0
     
-    def read_until_prompt(self, prompt="#", timeout=10, delay=0.5):
+    def read_until_prompt(self, prompt: str = "#", timeout: int = 10, delay: float = 0.5) -> str:
         """
         Чтение всего вывода до промпта (с пагинацией)
         
@@ -256,7 +258,7 @@ class SecureCRTBridge:
         
         return output
     
-    def execute_command(self, command, timeout=10):
+    def execute_command(self, command: str, timeout: int = 10) -> str:
         """
         Выполнение команды и получение полного вывода
         
@@ -270,7 +272,7 @@ class SecureCRTBridge:
         self.send_command(command)
         return self.read_until_prompt(timeout=timeout)
     
-    def get_session_list(self):
+    def get_session_list(self) -> List[str]:
         """
         Получение списка всех сессий
         
@@ -280,7 +282,7 @@ class SecureCRTBridge:
         if self.securecrt is None:
             return []
         
-        sessions = []
+        sessions: List[str] = []
         try:
             for i in range(1, self.securecrt.SessionCount + 1):
                 session = self.securecrt.Session(i)
@@ -290,7 +292,7 @@ class SecureCRTBridge:
         
         return sessions
     
-    def is_connected(self):
+    def is_connected(self) -> bool:
         """Проверка наличия подключения"""
         return self.securecrt is not None
 

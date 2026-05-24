@@ -10,14 +10,16 @@ GPON Huawei Diagnostic Tool - Qt Application
     pip install PyQt6 pywin32 pyperclip
 """
 
+from __future__ import annotations
+
 import sys
 import os
-import re
 from datetime import datetime
+from typing import Any, Optional
 
 # Добавляем путь к модулям проекта
-script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(script_dir)
+script_dir: str = os.path.dirname(os.path.abspath(__file__))
+project_root: str = os.path.dirname(script_dir)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
@@ -25,7 +27,7 @@ try:
     from PyQt6.QtGui import *
     from PyQt6.QtWidgets import *
     from PyQt6.QtCore import *
-    PyQt6_AVAILABLE = True
+    PyQt6_AVAILABLE: bool = True
 except ImportError:
     PyQt6_AVAILABLE = False
     print("ERROR: PyQt6 не установлен. Установите через: pip install PyQt6")
@@ -41,7 +43,7 @@ except ImportError:
 # Импортируем бридж для SecureCRT
 try:
     from GPON_HW.qt_securecrt_bridge import SecureCRTBridge
-    COM_AVAILABLE = True
+    COM_AVAILABLE: bool = True
 except ImportError:
     COM_AVAILABLE = False
     print("WARNING: SecureCRTBridge не доступен (pywin32)")
@@ -49,18 +51,18 @@ except ImportError:
 
 class GPONWorker(QThread):
     """Фоновый поток для диагностики ONT"""
-    result_ready = pyqtSignal(str)
-    error_occurred = pyqtSignal(str)
-    progress_update = pyqtSignal(str)
-    log_message = pyqtSignal(str)
+    result_ready: pyqtSignal = pyqtSignal(str)
+    error_occurred: pyqtSignal = pyqtSignal(str)
+    progress_update: pyqtSignal = pyqtSignal(str)
+    log_message: pyqtSignal = pyqtSignal(str)
 
-    def __init__(self, ont_data, mode="securecrt"):
+    def __init__(self, ont_data: str, mode: str = "securecrt") -> None:
         super().__init__()
-        self.ont_data = ont_data
-        self.mode = mode  # "securecrt" или "internal"
-        self.crt = None
+        self.ont_data: str = ont_data
+        self.mode: str = mode  # "securecrt" / "com" / "internal"
+        self.crt: Any = None
         
-    def run(self):
+    def run(self) -> None:
         try:
             # Парсинг ONT ID
             self.progress_update.emit("Парсинг ONT ID...")
@@ -119,16 +121,30 @@ class GPONWorker(QThread):
 class MainWindow(QMainWindow):
     """Главное окно приложения"""
     
-    def __init__(self, crt_obj=None):
+    def __init__(self, crt_obj: Any = None) -> None:
         super().__init__()
-        self.crt = crt_obj  # Глобальный crt из SecureCRT (если внутри)
-        self.bridge = None  # COM бридж (если снаружи)
-        self.worker = None
+        self.crt: Any = crt_obj
+        self.bridge: Optional[SecureCRTBridge] = None
+        self.worker: Optional[GPONWorker] = None
+        self.mode: str = "internal"
+        self.ont_frame: QSpinBox
+        self.ont_slot: QSpinBox
+        self.ont_port: QSpinBox
+        self.ont_id: QSpinBox
+        self.sn_input: QLineEdit
+        self.btn_diagnose: QPushButton
+        self.btn_clear: QPushButton
+        self.btn_save: QPushButton
+        self.btn_copy: QPushButton
+        self.progress: QProgressBar
+        self.status_label: QLabel
+        self.output_text: QPlainTextEdit
+        self.log_text: QPlainTextEdit
         
         self.init_ui()
         self.check_mode()
         
-    def check_mode(self):
+    def check_mode(self) -> None:
         """Определение режима работы"""
         if self.crt:
             self.mode = "securecrt"
@@ -140,7 +156,7 @@ class MainWindow(QMainWindow):
             self.mode = "internal"
             self.statusBar().showMessage("Режим: Внутренний (ограниченный функционал)")
     
-    def init_ui(self):
+    def init_ui(self) -> None:
         """Инициализация интерфейса"""
         self.setWindowTitle("GPON Huawei Diagnostic Tool")
         self.setGeometry(100, 100, 900, 700)
@@ -289,7 +305,7 @@ class MainWindow(QMainWindow):
         # Статус бар
         self.statusBar().showMessage("Готов")
         
-    def create_menu(self):
+    def create_menu(self) -> None:
         """Создание меню"""
         menubar = self.menuBar()
         
@@ -320,7 +336,7 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
         
-    def start_diagnosis(self):
+    def start_diagnosis(self) -> None:
         """Запуск диагностики"""
         # Сбор данных
         ont_data = f"{self.ont_frame.value()} {self.ont_slot.value()} {self.ont_port.value()} {self.ont_id.value()}"
@@ -351,16 +367,16 @@ class MainWindow(QMainWindow):
         self.worker.start()
         self.statusBar().showMessage("Выполняется диагностика...")
         
-    def on_progress(self, message):
+    def on_progress(self, message: str) -> None:
         """Обновление прогресса"""
         self.status_label.setText(message)
         
-    def on_log(self, message):
+    def on_log(self, message: str) -> None:
         """Добавление в лог"""
-        timestamp = datetime.now().strftime("%H:%M:%S")
+        timestamp: str = datetime.now().strftime("%H:%M:%S")
         self.log_text.appendPlainText(f"[{timestamp}] {message}")
         
-    def on_diagnosis_complete(self, report):
+    def on_diagnosis_complete(self, report: str) -> None:
         """Завершение диагностики"""
         self.output_text.appendPlainText(report)
         
@@ -369,7 +385,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Диагностика завершена", 5000)
         self.status_label.setText("")
         
-    def on_diagnosis_error(self, error):
+    def on_diagnosis_error(self, error: str) -> None:
         """Ошибка диагностики"""
         self.output_text.appendPlainText(f"[ERROR] {error}")
         
@@ -380,13 +396,13 @@ class MainWindow(QMainWindow):
         
         QMessageBox.critical(self, "Ошибка", f"Диагностика не выполнена:\n{error}")
         
-    def clear_output(self):
+    def clear_output(self) -> None:
         """Очистка вывода"""
         self.output_text.clear()
         self.log_text.clear()
         self.status_label.setText("")
         
-    def save_report(self):
+    def save_report(self) -> None:
         """Сохранение отчета"""
         content = self.output_text.toPlainText()
         if not content:
@@ -411,7 +427,7 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить:\n{e}")
                 
-    def copy_to_clipboard(self):
+    def copy_to_clipboard(self) -> None:
         """Копирование в буфер"""
         content = self.output_text.toPlainText()
         if not content:
@@ -422,7 +438,7 @@ class MainWindow(QMainWindow):
         clipboard.setText(content)
         self.statusBar().showMessage("Скопировано в буфер", 2000)
         
-    def test_com_connection(self):
+    def test_com_connection(self) -> None:
         """Тест COM подключения"""
         if not COM_AVAILABLE:
             QMessageBox.warning(self, "Ошибка", "pywin32 не установлен")
@@ -447,7 +463,7 @@ class MainWindow(QMainWindow):
         
         dialog.exec()
         
-    def show_about(self):
+    def show_about(self) -> None:
         """О программе"""
         QMessageBox.about(
             self,
@@ -458,7 +474,7 @@ class MainWindow(QMainWindow):
             "<p>Работает с SecureCRT через COM или встроенный Python</p>"
         )
         
-    def closeEvent(self, event):
+    def closeEvent(self, event: QCloseEvent) -> None:
         """Обработка закрытия"""
         if self.worker and self.worker.isRunning():
             reply = QMessageBox.question(
@@ -475,14 +491,14 @@ class MainWindow(QMainWindow):
 
 
 # Запуск приложения
-def main():
+def main() -> None:
     """Точка входа"""
     app = QApplication(sys.argv)
     app.setApplicationName("GPON Huawei Diagnostic Tool")
     app.setStyle("Fusion")
     
     # Проверка CRT (если запускается внутри SecureCRT)
-    crt_obj = None
+    crt_obj: Any = None
     if "crt" in globals():
         crt_obj = crt
         print("[OK] SecureCRT объект доступен")
