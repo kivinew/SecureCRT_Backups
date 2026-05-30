@@ -52,3 +52,9 @@ GePON_Login.vbs
 # (Existing rule kept)
 *.json
 
+# AI agent folders
+.blackbox/
+.claude/
+.opencode/
+.openclaw/
+.hermes/
