@@ -8,7 +8,7 @@ import time
 
 crt.Screen.Synchronous = True
 
-# Выбор конфигурации (1 - WanAccess, 0 - WanAccess_HG8245)
+# Выбор конфигурации (1 - WanAccess, 0 - WanAccess_HG8245, 2 - WanAccess-8245H)
 access = 1  # Можно изменить на 0 для другой конфигурации
 
 def send_command(command, delay=0.5) -> None:
@@ -30,7 +30,7 @@ def main() -> None:
             return
         frame, slot, port, ont = ont_parts
         
-        conf = "WanAccess" if access == 1 else "WanAccess_HG8245"
+        conf = "WanAccess" if access == 1 else "WanAccess_HG8245" 
         # Отправка команд конфигурации
         send_command("diagnose")
         send_command(f"ont-load info configuration {conf}.xml ftp 10.2.1.3 huawei ksa5oz6y")
