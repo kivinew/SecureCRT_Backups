@@ -16,20 +16,12 @@ sys.path.insert(0, SCRIPT_DIR)
 # Импортируем модуль GPON
 import GPON_class
 importlib.reload(GPON_class)
-from GPON_class import GPON, inject_crt, COMMANDS
+from GPON_class import GPON, inject_crt, COMMANDS, BAD_VERSIONS
 # Передаём объект crt в импортированный модуль
 inject_crt(crt)
 #______________________________________________________________
 
 MAC_DB_PATH = os.path.join(SCRIPT_DIR, "oui.txt")
-
-BAD_VERSIONS = {
-    "V1R003C00S108",
-    "V1R006C00S130",
-    "V1R006C00S205",
-    "V1R006C00S201",
-    "V1R006C01S201",
-}
 
 def load_mac_database():
     mac_db = {}

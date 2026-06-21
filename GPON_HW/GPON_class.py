@@ -9,7 +9,7 @@ import traceback
 import pyperclip
 
 # ========================================================================
-# Модуль GPON_class.py — содержит классы и утилиты для работы с GPON ONT
+# Модуль GPON_class.py — содержит константы, классы и функции для работы с GPON ONT
 # ========================================================================
 
 # ==================== ИНЪЕКЦИЯ CRT ====================
@@ -34,6 +34,7 @@ PRESS_Q: str = "---- More ( Press 'Q' to break ) ----"
 
 # Команды головной станции Huawei
 COMMANDS = {
+    'iface_gpon': "interface gpon {frame}/{slot}",
     'ont_info': "display ont info {frame} {slot} {port} {ont}",
     'info_by_serial': "display ont info by-sn {serial}",
     'info_by_description': "display ont info by-desc {description}",
