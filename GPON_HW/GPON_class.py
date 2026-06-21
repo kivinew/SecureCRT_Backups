@@ -146,8 +146,50 @@ class Ont:
 
 # ==================== КЛАСС Diagnose DIAGNOSTICS ====================
 
-class GPONDiagnostics:
+# ... (остальной код без изменений) ...
+
+class GPON:
     """Комплексная диагностика GPON ONT."""
+
+    # Маппинг: подстрока команды → символ(ы), отправляемые после команды
+    _POST_COMMAND_KEYS = (
+        ("display ont info", "q"),
+        ("optical-info", " "),
+        ("wan-info", " "),
+        ("port state", "\r"),
+        ("remote-ping", "\r"),
+        ("ont-port", "  "),
+        ("register-info", "   "),
+    )
+
+    @staticmethod
+    def send_command(command: str, delay: float = 0.1) -> str:
+        _ensure_crt()
+        crt.Screen.Send(command + "\r")
+        time.sleep(0.2)
+
+        # Исправлено: обращение к атрибуту класса GPON, а не Diagnose
+        for key, send_val in GPON._POST_COMMAND_KEYS:
+            if key in command and not (key == "display ont info" and "by-desc" in command):
+                crt.Screen.Send(send_val)
+                break
+
+        time.sleep(delay)
+        # Исправлено: вызов статического метода read_output того же класса
+        return GPON.read_output()
+
+    @staticmethod
+    def read_output() -> str:
+        _ensure_crt()
+        output = ""
+        while True:
+            line = crt.Screen.ReadString("\n", 1)
+            if not line:
+                break
+            output += line
+        return output
+
+    # ... (остальные методы без изменений) ...
 
     def __init__(self):
         self.parsed_data = self._init_parsed_data()
@@ -219,42 +261,6 @@ class GPONDiagnostics:
         except:
             pass
         return mac_db
-
-    # Маппинг: подстрока команды → символ(ы), отправляемые после команды
-    _POST_COMMAND_KEYS = (
-        ("display ont info", "q"),
-        ("optical-info", " "),
-        ("wan-info", " "),
-        ("port state", "\r"),
-        ("remote-ping", "\r"),
-        ("ont-port", "  "),
-        ("register-info", "   "),
-    )
-
-    @staticmethod
-    def send_command(command: str, delay: float = 0.1) -> str:
-        _ensure_crt()
-        crt.Screen.Send(command + "\r")
-        time.sleep(0.2)
-
-        for key, send_val in Diagnose._POST_COMMAND_KEYS:
-            if key in command and not (key == "display ont info" and "by-desc" in command):
-                crt.Screen.Send(send_val)
-                break
-
-        time.sleep(delay)
-        return Diagnose.read_output()
-
-    @staticmethod
-    def read_output() -> str:
-        _ensure_crt()
-        output = ""
-        while True:
-            line = crt.Screen.ReadString("\n", 1)
-            if not line:
-                break
-            output += line
-        return output
 
     def _enter_interface(self, frame, slot) -> None:
         """Переход в контекст interface gpon."""
