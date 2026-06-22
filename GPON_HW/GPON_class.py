@@ -134,7 +134,7 @@ class Ont:
         """Получает информацию об ONT."""
         _ensure_crt()
         try:
-            crt.Screen.Send(f"{ont_info} {self.frame} {self.slot} {self.port} {self.ont}\rq")
+            crt.Screen.Send(COMMANDS['ont_info'].format(frame=self.frame, slot=self.slot, port=self.port, ont=self.ont))
         except Exception as e:
             crt.Dialog.MessageBox(f"Ошибка при получении данных ONT: {e}")
 
@@ -145,8 +145,6 @@ class Ont:
         self.sn = serial
 
 # ==================== КЛАСС Diagnose DIAGNOSTICS ====================
-
-# ... (остальной код без изменений) ...
 
 class GPON:
     """Комплексная диагностика GPON ONT."""
@@ -175,6 +173,11 @@ class GPON:
                 break
 
         time.sleep(delay)
+
+        # # Дополнительное ожидание для команды optical-info
+        # if "optical-info" in command:
+        #     time.sleep(2)
+
         # Исправлено: вызов статического метода read_output того же класса
         return GPON.read_output()
 
@@ -335,6 +338,9 @@ class GPON:
     def diagnose_optics(self, frame, slot, port, ont, clipboard_data: str) -> str:
         output_optical_info = self.send_command(COMMANDS["optical_info"].format(port=port, ont=ont), 1)
 
+        crt.Dialog.MessageBox(f"Оптика: {output_optical_info}")
+
+
         for key in ("ont_rx_power", "olt_rx_power"):
             self._update_optic_value(output_optical_info, key)
 
@@ -345,6 +351,9 @@ class GPON:
 
         ont_rx_val = self.parsed_data["ont_rx_power"]
         olt_rx_val = self.parsed_data["olt_rx_power"]
+
+        crt.Dialog.MessageBox(f"Оптика: {ont_rx_val}/{olt_rx_val}")
+
 
         if ont_rx_val != "нет данных" and olt_rx_val != "нет данных":
             try:
